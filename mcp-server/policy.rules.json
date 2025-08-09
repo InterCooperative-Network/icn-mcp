@@ -2,7 +2,7 @@
   "no_direct_merges": true,
   "path_caps": {
     "architect": ["docs/**"],
-    "planner": [],
+    "planner": [""],
     "reviewer": ["docs/**", ".github/**", "ci/**", "tools/**"],
     "ops": [".github/**", "ci/**", "tools/**"]
   },

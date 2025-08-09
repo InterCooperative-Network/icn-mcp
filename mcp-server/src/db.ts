@@ -45,7 +45,7 @@ export function insertTask(input: InsertTaskInput): { id: string } {
   const db = getDb();
   const id = generateId('task');
   const stmt = db.prepare(
-    'INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, COALESCE(?, "open"), ? )'
+    "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
   );
   stmt.run(id, input.title, input.description ?? null, 'open', input.created_by ?? null);
   return { id };
