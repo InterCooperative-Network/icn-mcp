@@ -1,0 +1,15 @@
+{
+  "no_direct_merges": true,
+  "path_caps": {
+    "architect": ["docs/**"],
+    "planner": [""],
+    "reviewer": ["docs/**", ".github/**", "ci/**", "tools/**"],
+    "ops": [".github/**", "ci/**", "tools/**"]
+  },
+  "reviews_required": [
+    { "paths": ["docs/protocols/**"], "reviewers": ["security"] },
+    { "paths": [".github/**", "ci/**"], "reviewers": ["ops"] }
+  ]
+}
+
+

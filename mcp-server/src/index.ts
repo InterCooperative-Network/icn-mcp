@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { healthRoute, apiRoutes } from './api.js';
 
-const app = Fastify({ logger: false });
+const app = Fastify({ logger: true });
 app.register(healthRoute);
 app.register(apiRoutes, { prefix: '/api' });
 
