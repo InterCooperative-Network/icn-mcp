@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
 import { insertWebhookEvent } from './db.js';
+import { analyzePr } from './pr-coach.js';
 import { webhooksInvalidSigTotal, webhooksReceivedTotal } from './metrics.js';
 
 function safeStringify(body: unknown): string {
@@ -73,7 +74,17 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
   switch (event) {
     case 'issues':
     case 'issue_comment':
-    case 'pull_request':
+    case 'pull_request': {
+      try {
+        const analysis = analyzePr(payload as any);
+        if (analysis.advice.length > 0) {
+          req.log.info({ advice: analysis.advice, reqId: req.id }, 'pr coaching advice');
+        }
+      } catch (err) {
+        req.log.error({ err, reqId: req.id }, 'pr coaching error');
+      }
+      break;
+    }
     case 'check_suite':
       // Accept and process later
       break;

@@ -1,3 +1,24 @@
+## MCP Server API Extensions (v0.2)
+
+### Webhooks
+- POST `/api/webhooks/github`
+  - HMAC (sha256) via `X-Hub-Signature-256`
+  - Env: `WEBHOOK_SECRET`
+  - Handles: `issues`, `issue_comment`, `pull_request`, `check_suite`
+
+### Context Briefing
+- GET `/api/context/brief?task_id=<id>`
+  - Returns TaskBrief JSON
+
+### Worker Protocol
+- POST `/api/task/claim` (Bearer auth)
+- POST `/api/task/run` (Bearer auth)
+- GET `/api/task/status?task_id=<id>`
+
+### GitHub Integration
+- POST `/api/gh/issue/create` (Bearer auth)
+- POST `/api/pr/create` (Bearer auth)
+
 ## MCP Server API
 
 Base URL: http://localhost:8787
