@@ -37,10 +37,11 @@ export function initPolicyWatcher(onReload?: () => void) {
 }
 
 function matchGlob(glob: string, filePath: string): boolean {
-  // extremely small glob support: '**' and '*'
-  const esc = (s: string) => s.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const regexStr = '^' + esc(glob).replace(/\\\*\\\*/g, '.*').replace(/\\\*/g, '[^/]*') + '$';
-  return new RegExp(regexStr).test(filePath);
+  // minimal glob: '**' → '.*', '*' → '[^/]*'
+  const escapeRegex = (s: string) => s.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+  const pattern = escapeRegex(glob).replace(/\\\*\\\*/g, '.*').replace(/\\\*/g, '[^/]*');
+  const re = new RegExp('^' + pattern + '$');
+  return re.test(filePath);
 }
 
 export function checkPolicy(input: { actor: string; changedPaths: string[] }): PolicyDecision {
@@ -48,8 +49,8 @@ export function checkPolicy(input: { actor: string; changedPaths: string[] }): P
   const reasons: string[] = [];
 
   // path capabilities enforcement
-  const caps = rules.path_caps?.[input.actor] ?? [];
-  if (caps.length > 0) {
+  if (rules.path_caps && Object.prototype.hasOwnProperty.call(rules.path_caps, input.actor)) {
+    const caps = rules.path_caps[input.actor] ?? [];
     for (const p of input.changedPaths) {
       const allowed = caps.some((g) => matchGlob(g, p));
       if (!allowed) reasons.push(`path ${p} not allowed for actor ${input.actor}`);
