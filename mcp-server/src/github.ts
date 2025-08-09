@@ -43,7 +43,7 @@ export async function createPr(input: {
   const token = process.env.GITHUB_TOKEN;
   const owner = process.env.GITHUB_OWNER || 'InterCooperative-Network';
   const repo = process.env.GITHUB_REPO || 'icn-mcp';
-  const base = process.env.GITHUB_BASE || 'main';
+  const base = process.env.GITHUB_BASE || process.env.GITHUB_DEFAULT_BRANCH || 'main';
 
   if (token && owner && repo) {
     const octokit = new Octokit({ auth: token });
