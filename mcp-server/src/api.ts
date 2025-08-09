@@ -8,6 +8,7 @@ import { tasksTotal, policyDeniesTotal, prCreatesTotal, agentsTotal } from './me
 import crypto from 'node:crypto';
 import { webhooksRoute } from './webhooks.js';
 import { buildTaskBrief } from './context.js';
+import { workersRoute } from './workers.js';
 
 export async function healthRoute(f: FastifyInstance) {
   f.get('/healthz', async () => ({ ok: true }));
@@ -114,5 +115,8 @@ export async function apiRoutes(f: FastifyInstance) {
       return reply.code(404).send({ ok: false, error: 'not_found' });
     }
   });
+
+  // Workers protocol
+  await workersRoute(f);
 }
 
