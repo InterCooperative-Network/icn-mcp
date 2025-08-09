@@ -15,6 +15,7 @@ async function main() {
   ];
   if (!hasIntent) {
     // still proceed; v0 planner is naive
+    /* noop */
   }
 
   const baseUrl = process.env.MCP_BASE_URL || 'http://localhost:8787/api';

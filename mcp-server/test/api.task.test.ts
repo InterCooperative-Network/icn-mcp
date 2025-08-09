@@ -8,7 +8,7 @@ describe('task api', () => {
   const testDb = path.resolve(process.cwd(), `var/test-${Date.now()}.sqlite`);
   beforeEach(() => {
     process.env.MCP_DB_PATH = testDb;
-    try { fs.unlinkSync(testDb); } catch {}
+    try { fs.unlinkSync(testDb); } catch {/* noop */}
   });
 
   it('creates and lists tasks', async () => {

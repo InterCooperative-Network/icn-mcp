@@ -1,15 +1,27 @@
 name: CI
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      CI: true
+      npm_config_build_from_source: "false"
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - run: npm i
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - run: npm ci
+
       - run: npm run lint
-      - run: npm test
-      - run: npm run check
+
+      - run: npm test -ws --if-present
+
       - run: npm run build
 
