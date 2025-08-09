@@ -17,9 +17,14 @@ describe('task api', () => {
     app.register(apiRoutes, { prefix: '/api' });
     await app.ready();
 
+    // Bootstrap an agent for auth
+    const reg = await app.inject({ method: 'POST', url: '/api/agent/register', payload: { name: 'Planner', kind: 'planner' } });
+    const token = (reg.json() as any).token;
+
     const createRes = await app.inject({
       method: 'POST',
       url: '/api/task/create',
+      headers: { Authorization: `Bearer ${token}` },
       payload: { title: 'Test Task' }
     });
     expect(createRes.statusCode).toBe(200);

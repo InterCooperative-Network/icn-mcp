@@ -1,8 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { insertTask, listTasks, insertRun, insertDep } from './db.js';
+import { insertTask, listTasks, insertDep, insertAgent, countAgents } from './db.js';
 import { checkPolicy, initPolicyWatcher } from './policy.js';
-import { createLocalPr } from './github.js';
+import { createPr } from './github.js';
+import { requireAuth } from './auth.js';
+import { tasksTotal, policyDeniesTotal, prCreatesTotal, agentsTotal } from './metrics.js';
+import crypto from 'node:crypto';
 
 export async function healthRoute(f: FastifyInstance) {
   f.get('/healthz', async () => ({ ok: true }));
@@ -32,19 +35,21 @@ export async function apiRoutes(f: FastifyInstance) {
     return reply.code(500).send({ ok: false, error: 'internal_error' });
   });
 
-  f.post('/agent/register', async (req, reply) => {
+  f.post('/agent/register', { preHandler: requireAuth({ allowIfNoAgents: true }) }, async (req, reply) => {
     const body = AgentRegister.parse(req.body);
-    // Store as a run with status 'register'
-    const run = insertRun({ task_id: 'agent-registry', agent: body.kind, status: 'register', notes: body.name });
-    return reply.code(200).send({ ok: true, run_id: run.id });
+    const token = crypto.randomBytes(32).toString('hex');
+    const { id } = insertAgent({ name: body.name, kind: body.kind, token });
+    agentsTotal.set(countAgents());
+    return reply.code(200).send({ ok: true, id, token });
   });
 
-  f.post('/task/create', async (req, reply) => {
+  f.post('/task/create', { preHandler: requireAuth() }, async (req, reply) => {
     const body = TaskCreate.parse(req.body);
     const { id } = insertTask({ title: body.title, description: body.description, created_by: body.created_by });
     if (body.depends_on && body.depends_on.length > 0) {
       for (const dep of body.depends_on) insertDep({ task_id: id, depends_on: dep });
     }
+    tasksTotal.inc();
     return reply.send({ ok: true, id });
   });
 
@@ -56,11 +61,12 @@ export async function apiRoutes(f: FastifyInstance) {
   // Policy engine endpoints
   initPolicyWatcher(() => f.log.info('policy rules reloaded'));
   const PolicyCheck = z.object({ actor: z.string(), changedPaths: z.array(z.string()) });
-  f.post('/policy/check', async (req, reply) => {
+  f.post('/policy/check', { preHandler: requireAuth() }, async (req, reply) => {
     try {
       const body = PolicyCheck.parse(req.body);
       const decision = checkPolicy({ actor: body.actor, changedPaths: body.changedPaths });
       f.log.info({ decision }, 'policy decision');
+      if (!decision.allow) policyDeniesTotal.inc();
       return reply.send(decision);
     } catch (err: any) {
       f.log.error({ err }, 'policy check error');
@@ -68,17 +74,27 @@ export async function apiRoutes(f: FastifyInstance) {
     }
   });
 
-  // Local PR adapter
+  // PR adapter
   const PrCreate = z.object({
     task_id: z.string(),
     title: z.string(),
     body: z.string(),
     files: z.array(z.object({ path: z.string(), content: z.string() }))
   });
-  f.post('/pr/create', async (req, reply) => {
+  f.post('/pr/create', { preHandler: requireAuth() }, async (req, reply) => {
     const body = PrCreate.parse(req.body);
-    const res = await createLocalPr(body);
-    return reply.send(res);
+    // Policy check before PR
+    const paths = body.files.map((f) => f.path);
+    const decision = checkPolicy({ actor: req.agent?.kind ?? 'unknown', changedPaths: paths });
+    f.log.info({ decision, reqId: req.id }, 'policy decision for pr/create');
+    if (!decision.allow) {
+      policyDeniesTotal.inc();
+      return reply.code(200).send({ allow: false, reasons: decision.reasons });
+    }
+    const res = await createPr(body);
+    prCreatesTotal.inc({ mode: res.mode });
+    f.log.info({ mode: (res as any).mode, branch_hint: body.task_id, reqId: req.id }, 'pr create');
+    return reply.send({ ok: true, ...res });
   });
 }
 
