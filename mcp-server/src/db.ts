@@ -42,7 +42,7 @@ function applyMigrations(db: Database.Database) {
       const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
       db.exec(sql);
     }
-  } catch (err) {
+  } catch {
     // Fallback: apply initial schema if directory missing
     const initPath = path.resolve(process.cwd(), '../db/migrations/0001_init.sql');
     if (fs.existsSync(initPath)) {

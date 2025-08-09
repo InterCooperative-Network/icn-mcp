@@ -59,8 +59,8 @@ export async function createPr(input: {
     const baseSha = baseRef.object.sha;
     try {
       await octokit.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: baseSha });
-    } catch {
-      // branch may already exist - continue
+    } catch (err) {
+      // Branch may already exist; safe to ignore and continue committing on it.
     }
 
     // commit files
@@ -71,8 +71,8 @@ export async function createPr(input: {
       try {
         const existing = await octokit.repos.getContent({ owner, repo, path: file.path, ref: branch });
         if (!Array.isArray(existing.data) && 'sha' in existing.data) sha = (existing.data as any).sha;
-      } catch {
-        // not existing
+      } catch (err) {
+        // File may not exist on the branch yet; that's expected when creating it.
       }
       await octokit.repos.createOrUpdateFileContents({
         owner,

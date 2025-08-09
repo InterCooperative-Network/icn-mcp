@@ -1,10 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { insertTask, listTasks, insertRun, insertDep, insertAgent, countAgents } from './db.js';
+import { insertTask, listTasks, insertDep, insertAgent, countAgents } from './db.js';
 import { checkPolicy, initPolicyWatcher } from './policy.js';
 import { createPr } from './github.js';
 import { requireAuth } from './auth.js';
 import { tasksTotal, policyDeniesTotal, prCreatesTotal, agentsTotal } from './metrics.js';
+import crypto from 'node:crypto';
 
 export async function healthRoute(f: FastifyInstance) {
   f.get('/healthz', async () => ({ ok: true }));
@@ -36,7 +37,7 @@ export async function apiRoutes(f: FastifyInstance) {
 
   f.post('/agent/register', { preHandler: requireAuth({ allowIfNoAgents: true }) }, async (req, reply) => {
     const body = AgentRegister.parse(req.body);
-    const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    const token = crypto.randomBytes(32).toString('hex');
     const { id } = insertAgent({ name: body.name, kind: body.kind, token });
     agentsTotal.set(countAgents());
     return reply.code(200).send({ ok: true, id, token });
