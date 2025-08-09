@@ -1,0 +1,53 @@
+---
+description: ICN MCP Server Architecture and Core Patterns
+globs: ["**/*.ts", "**/*.js", "**/*.json"]
+alwaysApply: true
+---
+
+# ICN MCP Server Architecture
+
+You are working on the InterCooperative Network's MCP (Model Context Protocol) server - a sophisticated agent orchestration system.
+
+## Core Architecture
+- **MCP Server (HQ)**: Central orchestrator at VM 10.8.10.30:8787
+- **Agent Workers**: Connect via HTTP APIs, follow bearer token auth
+- **Tech Stack**: TypeScript/Node 20, Fastify, SQLite (better-sqlite3), Vitest, npm workspaces
+
+## Established Patterns - MUST FOLLOW
+- All mutating endpoints require `Authorization: Bearer <token>`
+- Use structured errors with proper HTTP codes and reqId logging
+- Database operations through helpers in `mcp-server/src/db.ts`
+- Metrics instrumentation with prom-client counters/gauges
+- Small, focused commits with conventional messages
+
+## Workspace Structure
+```
+mcp-server/          # Core server (Fastify app)
+agent-sdk/           # Client SDK for agents
+agents/              # Built-in agent implementations
+docs/                # API docs, integration guides
+icn-rfcs/           # Change proposals
+db/migrations/       # SQL migrations
+```
+
+## Never Break These Rules
+- Keep all tests passing: `npm run -ws --if-present lint && npm test && npm build`
+- Use existing auth middleware for new mutating endpoints
+- Follow established error handling patterns
+- Instrument new features with metrics
+- Update docs for new APIs
+
+## Current Capabilities (Merged/Pending)
+- ✅ Task management (`/api/task/create`, `/api/task/list`) 
+- ✅ Agent registration with bearer tokens (`/api/agent/register`)
+- ✅ Policy engine (`/api/policy/check`) with JSON rules
+- ✅ PR adapter (local + GitHub via Octokit) (`/api/pr/create`)
+- ✅ Metrics endpoint (`/metrics`) with Prometheus counters
+- ✅ Database migrations, auth middleware, structured logging
+
+## Mission Context
+This is the foundation for multi-agent coordination where:
+- GitHub Copilot agents can claim tasks and create PRs
+- Cursor can follow standardized briefings 
+- Local LLM runners follow the same protocol
+- All agents get consistent, structured context

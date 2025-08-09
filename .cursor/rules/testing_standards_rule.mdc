@@ -1,0 +1,153 @@
+---
+description: Testing patterns and requirements
+globs: ["mcp-server/test/**/*.ts", "**/*.test.ts"]
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Test Organization
+- **One test file per source file**: `api.ts` → `test/api.test.ts`
+- **Group related tests** in describe blocks
+- **Descriptive test names**: "creates task with valid input", "rejects invalid auth token"
+- **Test files location**: `mcp-server/test/`
+
+## Test Pattern Template
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest';
+import { request } from 'undici';
+import { setTestDb } from '../src/db.js';
+
+describe('task API', () => {
+  let token: string;
+  
+  beforeEach(async () => {
+    // Fresh database for each test
+    setTestDb(':memory:');
+    
+    // Register agent and get token for auth tests
+    const res = await request('http://localhost:8787/api/agent/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'test-agent', kind: 'test' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const data = await res.body.json();
+    token = data.token;
+  });
+
+  it('creates task with valid input', async () => {
+    const res = await request('http://localhost:8787/api/task/create', {
+      method: 'POST',
+      headers: { 
+        'authorization': `Bearer ${token}`,
+        'content-type': 'application/json' 
+      },
+      body: JSON.stringify({ 
+        title: 'test task', 
+        description: 'test description' 
+      })
+    });
+    
+    expect(res.statusCode).toBe(201);
+    const data = await res.body.json();
+    expect(data.ok).toBe(true);
+    expect(data.id).toBeDefined();
+  });
+
+  it('rejects request without auth token', async () => {
+    const res = await request('http://localhost:8787/api/task/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'unauthorized task' })
+    });
+    
+    expect(res.statusCode).toBe(401);
+    const data = await res.body.json();
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('unauthorized');
+  });
+});
+```
+
+## Required Test Coverage Categories
+1. **Happy path**: Valid inputs produce expected outputs
+2. **Authentication**: Endpoints reject requests without proper tokens
+3. **Validation**: Invalid inputs return 400 with Zod error details
+4. **Authorization**: Proper tokens but insufficient permissions return 403
+5. **Edge cases**: Empty lists, missing resources (404), boundary conditions
+6. **Error handling**: Server errors return 500 with proper logging
+
+## Mock Patterns
+```typescript
+// Database isolation
+beforeEach(() => {
+  setTestDb(':memory:'); // Fresh database for each test
+});
+
+// Mock external services (GitHub API)
+import { vi } from 'vitest';
+vi.mock('@octokit/rest', () => ({
+  Octokit: vi.fn(() => ({
+    repos: {
+      createOrUpdateFileContents: vi.fn(),
+      getContent: vi.fn()
+    }
+  }))
+}));
+
+// Test with real HTTP requests
+import { request } from 'undici';
+const response = await request(`${baseUrl}/api/endpoint`, options);
+```
+
+## Metrics Testing
+```typescript
+import { register } from 'prom-client';
+
+it('increments task creation counter', async () => {
+  const before = await register.getSingleMetric('icn_mcp_tasks_total');
+  const beforeValue = before ? before.get().values[0].value : 0;
+  
+  await request('http://localhost:8787/api/task/create', {
+    method: 'POST',
+    headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ title: 'metric test' })
+  });
+  
+  const after = await register.getSingleMetric('icn_mcp_tasks_total');
+  const afterValue = after.get().values[0].value;
+  expect(afterValue).toBe(beforeValue + 1);
+});
+```
+
+## Test Commands
+Ensure these pass before committing:
+```bash
+npm run -ws --if-present lint    # ESLint checks
+npm run -ws --if-present test    # Run all tests
+npm run -ws --if-present build   # TypeScript compilation
+```
+
+## Database Test Helpers
+```typescript
+// Helper for test data setup
+function createTestTask(overrides = {}) {
+  return insertTask({
+    title: 'test task',
+    description: 'test description',
+    created_by: 'test-agent',
+    ...overrides
+  });
+}
+
+// Helper for auth setup
+async function getTestToken(agentName = 'test-agent') {
+  const res = await request('http://localhost:8787/api/agent/register', {
+    method: 'POST',
+    body: JSON.stringify({ name: agentName, kind: 'test' }),
+    headers: { 'content-type': 'application/json' }
+  });
+  const data = await res.body.json();
+  return data.token;
+}
+```

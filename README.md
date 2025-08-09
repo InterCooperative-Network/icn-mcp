@@ -8,6 +8,17 @@ MCP server and agent ecosystem to orchestrate AI agents for ICN development. Eve
 - `npm run lint && npm test && npm run build`
 - `npm run -w mcp-server dev` then GET `http://localhost:8787/healthz` → `{ ok: true }`
 
+## Webhooks
+- Configure GitHub webhook to `POST /api/webhooks/github` with `WEBHOOK_SECRET`
+
+## Worker Protocol
+- `POST /api/task/claim` (Bearer)
+- `POST /api/task/run` (Bearer)
+- `GET /api/task/status?task_id=...`
+
+## Context Briefs
+- `GET /api/context/brief?task_id=...`
+
 ### Agents quickstart
 
 With the server running:

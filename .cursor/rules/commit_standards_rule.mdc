@@ -1,0 +1,84 @@
+---
+description: Git commit and PR standards
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# Commit & PR Standards
+
+## Commit Message Format
+Follow conventional commits exactly:
+
+```
+<type>(<scope>): <description>
+
+Examples:
+feat(mcp-server): add context briefing endpoint
+feat(auth): bearer token middleware with bootstrap
+feat(webhooks): github webhook handler with HMAC verification
+test(api): comprehensive task and policy tests  
+docs(api): worker protocol and briefing format
+chore(deps): update dependencies to latest versions
+fix(db): handle migration errors properly
+refactor(auth): simplify token validation logic
+```
+
+## Valid Types
+- **feat**: New feature or enhancement
+- **fix**: Bug fix
+- **docs**: Documentation changes
+- **test**: Adding or updating tests
+- **refactor**: Code refactoring without functionality change
+- **chore**: Maintenance tasks, dependency updates
+- **ci**: CI/CD pipeline changes
+
+## Valid Scopes
+- **mcp-server**: Core server changes
+- **agent-sdk**: SDK for agents
+- **agents**: Built-in agent implementations  
+- **auth**: Authentication/authorization
+- **db**: Database, migrations
+- **api**: API endpoints
+- **webhooks**: Webhook handling
+- **metrics**: Monitoring/observability
+- **docs**: Documentation
+- **ci**: CI/CD changes
+- **github**: GitHub integration features
+
+## PR Requirements
+- **Title format**: `feat(scope): brief description of changes`
+- **Body**: Include checklist of implemented features
+- **All tests must pass**: `npm run -ws --if-present lint && npm test && npm build`
+- **Documentation updated** for new APIs
+- **No breaking changes** without migration plan and RFC
+
+## PR Body Template
+```markdown
+## What's in this PR
+- Brief description of changes
+- Why these changes were needed
+
+## Checklist
+- [ ] All tests pass locally
+- [ ] New APIs documented in docs/api/
+- [ ] Metrics added for new features
+- [ ] Auth requirements followed
+- [ ] Database helpers added/updated as needed
+
+## Testing
+- Describe how to test the changes
+- Include curl examples for new endpoints
+```
+
+## Branching Strategy
+- **Feature branches**: `feat/descriptive-name` (e.g., `feat/webhooks-context-worker`)
+- **Bug fixes**: `fix/descriptive-name` (e.g., `fix/auth-token-validation`)
+- **Documentation**: `docs/descriptive-name` (e.g., `docs/api-worker-protocol`)
+- **Base all branches on `main`**
+- **Prefer multiple small PRs** over one large PR
+
+## Commit Practices
+- **Small, focused commits** - one logical change per commit
+- **Commit frequently** during development
+- **Squash related commits** before opening PR if needed
+- **Test after each commit** to ensure stability

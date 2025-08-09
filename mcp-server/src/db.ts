@@ -11,6 +11,9 @@ export type TaskRow = { id: string; title: string; description: string | null; s
 export type InsertRunInput = { task_id: string; agent: string; status: string; notes?: string };
 export type InsertArtifactInput = { task_id: string; kind: string; path: string; meta?: unknown };
 export type AgentRow = { id: string; name: string; kind: string; token: string; created_at: string };
+export type InsertWebhookEventInput = {
+  event: string; delivery?: string; action?: string; repo?: string; sender?: string; payload?: unknown
+};
 
 let dbInstance: Database.Database | null = null;
 let dbPathInUse: string | null = null;
@@ -74,6 +77,18 @@ export function listTasks(): TaskRow[] {
   return rows as TaskRow[];
 }
 
+export function getTaskById(id: string): TaskRow | null {
+  const db = getDb();
+  const row = db.prepare('SELECT id, title, description, status, created_at FROM tasks WHERE id = ?').get(id);
+  return (row as TaskRow) ?? null;
+}
+
+export function getTaskDeps(id: string): string[] {
+  const db = getDb();
+  const rows = db.prepare('SELECT depends_on FROM task_deps WHERE task_id = ?').all(id) as Array<{ depends_on: string }>;
+  return rows.map((r) => r.depends_on);
+}
+
 export function insertRun(input: InsertRunInput): { id: string } {
   const db = getDb();
   const id = generateId('run');
@@ -120,5 +135,23 @@ export function countAgents(): number {
     // If table does not exist yet during bootstrap, treat as zero agents
     return 0;
   }
+}
+
+export function insertWebhookEvent(input: InsertWebhookEventInput): { id: string } {
+  const db = getDb();
+  const id = generateId('wh');
+  const stmt = db.prepare(
+    'INSERT INTO webhook_events (id, event, delivery, action, repo, sender, payload) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+  stmt.run(
+    id,
+    input.event,
+    input.delivery ?? null,
+    input.action ?? null,
+    input.repo ?? null,
+    input.sender ?? null,
+    input.payload ? JSON.stringify(input.payload) : null
+  );
+  return { id };
 }
 

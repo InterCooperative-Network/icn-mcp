@@ -1,0 +1,79 @@
+---
+description: API endpoint development patterns and validation
+globs: ["mcp-server/src/api.ts", "mcp-server/src/*.ts"]
+alwaysApply: false
+---
+
+# API Development Standards
+
+## Endpoint Pattern
+Always follow this exact structure for new endpoints:
+
+```typescript
+// 1. Define Zod schema
+const CreateTaskSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  created_by: z.string().optional()
+});
+
+// 2. Route with auth (if mutating)
+app.post('/api/task/create', { preHandler: requireAuth() }, async (req, reply) => {
+  try {
+    const body = CreateTaskSchema.parse(req.body);
+    const result = insertTask(body);
+    req.log.info({ task_id: result.id, reqId: req.id }, 'task created');
+    return reply.code(201).send({ ok: true, id: result.id });
+  } catch (err) {
+    req.log.error({ err, reqId: req.id }, 'task creation failed');
+    if (err instanceof z.ZodError) {
+      return reply.code(400).send({ ok: false, error: 'validation_failed', details: err.errors });
+    }
+    return reply.code(500).send({ ok: false, error: 'internal_error' });
+  }
+});
+```
+
+## Auth Requirements
+- **GET endpoints**: Usually public (healthz, task/list, metrics)
+- **POST/PUT/DELETE**: Require `Authorization: Bearer <token>`
+- Use existing `requireAuth()` middleware from `mcp-server/src/auth.ts`
+- **Bootstrap exception**: `/api/agent/register` allows first registration without token
+
+## Error Handling Standards
+- Always use structured errors with reqId
+- **Zod validation errors** → 400 with details
+- **Auth failures** → 401 with generic message (don't leak token details)
+- **Policy violations** → 403 with specific reasons
+- **Not found** → 404
+- **Server errors** → 500 (log full error, return generic message)
+
+## Logging & Metrics Pattern
+```typescript
+// Logging with reqId
+req.log.info({ data: result, reqId: req.id }, 'operation completed');
+req.log.error({ err, reqId: req.id }, 'operation failed');
+
+// Metrics increment
+taskCreateTotal.inc();
+policyDeniesTotal.inc();
+prCreateTotal.inc({ mode: 'github' }); // Use labels for categorization
+```
+
+## Response Format Standards
+```typescript
+// Success responses
+{ ok: true, id: "uuid", data: {...} }
+{ ok: true, count: 5, items: [...] }
+
+// Error responses  
+{ ok: false, error: "validation_failed", details: [...] }
+{ ok: false, error: "unauthorized" }
+{ ok: false, error: "insufficient_permissions", reasons: [...] }
+```
+
+## Validation with Zod
+- Always validate request bodies with Zod schemas
+- Return detailed validation errors to help agent developers
+- Use `.optional()` for optional fields, `.min(1)` for required strings
+- Validate auth headers and URL parameters when needed

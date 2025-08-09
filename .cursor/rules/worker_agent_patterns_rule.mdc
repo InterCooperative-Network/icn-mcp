@@ -1,0 +1,244 @@
+---
+description: Agent and worker integration patterns
+globs: ["agents/**/*.ts", "mcp-server/src/workers.ts", "mcp-server/src/context.ts"]
+alwaysApply: false
+---
+
+# Agent & Worker Integration Patterns
+
+## Universal Worker Protocol
+All agents (GitHub Copilot, Cursor, local runners) MUST follow this exact protocol:
+
+### 1. Registration & Authentication
+```typescript
+// Register and get bearer token
+const registerRes = await fetch(`${MCP_URL}/api/agent/register`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ 
+    name: 'agent-name', 
+    kind: 'planner|architect|reviewer|ops' 
+  })
+});
+const { token } = await registerRes.json();
+
+// Store token for all subsequent requests
+const authHeaders = { 'authorization': `Bearer ${token}` };
+```
+
+### 2. Task Claiming
+```typescript
+// Claim next available task
+const claimRes = await fetch(`${MCP_URL}/api/task/claim`, {
+  method: 'POST',
+  headers: { ...authHeaders, 'content-type': 'application/json' }
+});
+
+if (claimRes.status === 200) {
+  const { task_id } = await claimRes.json();
+  // Proceed with task
+} else if (claimRes.status === 204) {
+  // No tasks available, wait and retry
+  console.log('No tasks available');
+}
+```
+
+### 3. Context Briefing
+```typescript
+// Get detailed task brief with all context
+const briefRes = await fetch(`${MCP_URL}/api/context/brief?task_id=${task_id}&format=json`);
+const brief = await briefRes.json();
+
+// Brief contains everything needed:
+// - Task details and acceptance criteria
+// - Repository information and relevant files
+// - Policy constraints and capabilities required
+// - Step-by-step implementation guide
+// - Coding conventions and test patterns
+```
+
+### 4. Work Execution & Progress Reporting
+```typescript
+// Report progress at each major step
+await fetch(`${MCP_URL}/api/task/run`, {
+  method: 'POST',
+  headers: { ...authHeaders, 'content-type': 'application/json' },
+  body: JSON.stringify({ 
+    task_id, 
+    status: 'in_progress', 
+    notes: 'Completed step 1: database migration',
+    artifacts: ['db/migrations/0003_webhooks.sql']
+  })
+});
+
+// Continue reporting as work progresses
+await fetch(`${MCP_URL}/api/task/run`, {
+  method: 'POST',
+  headers: { ...authHeaders, 'content-type': 'application/json' },
+  body: JSON.stringify({ 
+    task_id, 
+    status: 'testing', 
+    notes: 'All tests passing, ready for PR'
+  })
+});
+```
+
+### 5. PR Creation
+```typescript
+// Create PR when work is complete
+await fetch(`${MCP_URL}/api/pr/create`, {
+  method: 'POST',
+  headers: { ...authHeaders, 'content-type': 'application/json' },
+  body: JSON.stringify({ 
+    task_id, 
+    title: 'feat(webhooks): github webhook handler with HMAC verification',
+    files: [
+      { path: 'mcp-server/src/webhooks.ts', content: fileContent },
+      { path: 'mcp-server/test/webhooks.test.ts', content: testContent }
+    ],
+    mode: 'auto' // Will use GitHub if configured, local fallback otherwise
+  })
+});
+```
+
+## Context Brief Format (Standard)
+All agents receive identical brief structure:
+
+```typescript
+interface TaskBrief {
+  task: {
+    id: number;
+    title: string;
+    description: string;
+    acceptance: string[]; // Clear checklist of requirements
+  };
+  repo: {
+    owner: string;
+    repo: string;
+    default_branch: string;
+    paths: string[]; // Relevant directories for this task
+  };
+  starter_files: Array<{
+    path: string;
+    hint: string;     // What to focus on in this file
+    content?: string; // Current content if relevant
+  }>;
+  policy: {
+    caps_required: string[];    // Capabilities this task needs
+    write_scopes: string[];     // Paths agent can modify
+    reviews_required: string[]; // Who must review changes
+  };
+  steps: string[]; // Ordered implementation steps
+  conventions: {
+    commit_format: string;
+    test_patterns: string[];
+    coding_style: string[];
+  };
+}
+```
+
+## Agent Implementation Requirements
+
+### Stateless Design
+- Agents MUST be stateless - all context comes from MCP briefings
+- No local state persistence beyond current task execution
+- All progress reported back to MCP for coordination
+
+### Policy Compliance
+```typescript
+// Always check policy constraints before taking action
+const policyRes = await fetch(`${MCP_URL}/api/policy/check`, {
+  method: 'POST',
+  headers: { ...authHeaders, 'content-type': 'application/json' },
+  body: JSON.stringify({
+    actor: agentName,
+    action: 'write',
+    path: 'mcp-server/src/new-file.ts'
+  })
+});
+
+const { allow, reasons } = await policyRes.json();
+if (!allow) {
+  console.error('Policy violation:', reasons);
+  return; // Abort action
+}
+```
+
+### Error Handling
+```typescript
+// Structured error reporting
+await fetch(`${MCP_URL}/api/task/run`, {
+  method: 'POST',
+  headers: { ...authHeaders, 'content-type': 'application/json' },
+  body: JSON.stringify({ 
+    task_id, 
+    status: 'failed', 
+    notes: 'Compilation error in generated code',
+    error: {
+      type: 'compilation_error',
+      details: 'TypeScript error on line 45: Type mismatch',
+      recovery_suggestions: ['Check Zod schema validation', 'Verify import statements']
+    }
+  })
+});
+```
+
+## GitHub Integration Patterns
+
+### Issue-Based Task Assignment
+```typescript
+// MCP creates GitHub issues for tasks
+// Issue body contains Task-ID for webhook correlation
+const issueBody = `
+Task-ID: ${taskId}
+
+## Goal
+${brief.task.description}
+
+## Acceptance Criteria
+${brief.task.acceptance.map(item => `- [ ] ${item}`).join('\n')}
+
+## Implementation Steps
+${brief.steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
+`;
+```
+
+### Branch Naming Convention
+```typescript
+// All PRs use standardized branch names
+const branchName = `tasks/${taskId}-${kebabCase(brief.task.title)}`;
+// Example: tasks/42-add-webhooks-context-worker
+```
+
+### Webhook Event Handling
+```typescript
+// MCP processes webhook events to update task status
+// Agents don't need to handle webhooks directly
+// Issues -> task updates, PRs -> policy checks, etc.
+```
+
+## Local Development Integration
+
+### Cursor Integration
+```typescript
+// Cursor agents run locally, call MCP over network
+const MCP_URL = 'http://10.8.10.30:8787'; // VM address
+const AGENT_TOKEN = process.env.AGENT_TOKEN; // From registration
+
+// Follow same protocol as any other agent
+// Use local LLM (Ollama) for reasoning/drafting
+// Report progress back to MCP
+```
+
+### Environment Configuration
+```bash
+# Required environment variables for agents
+MCP_SERVER_URL=http://10.8.10.30:8787
+AGENT_TOKEN=<from_registration>
+AGENT_NAME=cursor-local
+AGENT_KIND=architect
+
+# Optional for local LLM integration
+OLLAMA_URL=http://127.0.0.1:11434
+LLM_MODEL=llama3
+```

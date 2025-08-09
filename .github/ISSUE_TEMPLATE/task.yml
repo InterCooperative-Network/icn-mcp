@@ -1,0 +1,31 @@
+name: ICN Task
+description: Create a new structured ICN task for MCP agents
+title: "feat(mcp): <short title>"
+labels: ["task", "mcp"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: Concise description of the task goal
+      placeholder: "Implement webhook handling and worker protocol"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Bullet list of acceptance criteria
+      placeholder: "- Endpoint X returns Y\n- Tests cover Z"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Suggested Steps
+      description: Suggested steps for agents to follow
+      placeholder: "1. Add DB migration\n2. Implement handler\n3. Add tests"
+    validations:
+      required: false
+
+
