@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { request } from 'undici';
 
 function renderDoc(): string {
