@@ -1,7 +1,11 @@
 {
   "name": "icn-mcp",
   "private": true,
-  "workspaces": ["mcp-server", "agent-sdk", "agents/*"],
+  "workspaces": [
+    "mcp-server",
+    "agent-sdk",
+    "agents/*"
+  ],
   "scripts": {
     "build": "npm run -ws --if-present build",
     "test": "npm run -ws --if-present test",
@@ -12,13 +16,13 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@eslint/js": "^9.8.0",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
-    "eslint": "^9.8.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.4.0",
-    "vitest": "^1.5.0"
+    "@eslint/js": "^9.33.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.33.0",
+    "globals": "^16.3.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }
-
