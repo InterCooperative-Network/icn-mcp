@@ -17,10 +17,15 @@ describe('policy check', () => {
     app.register(apiRoutes, { prefix: '/api' });
     await app.ready();
 
+    // Bootstrap an architect agent and get token
+    const reg = await app.inject({ method: 'POST', url: '/api/agent/register', payload: { name: 'Arch', kind: 'architect' } });
+    const token = (reg.json() as any).token;
+
     // Deny: planner cannot modify docs/** per default rules
     const denyRes = await app.inject({
       method: 'POST',
       url: '/api/policy/check',
+      headers: { Authorization: `Bearer ${token}` },
       payload: { actor: 'planner', changedPaths: ['docs/protocols/x.md'] }
     });
     expect(denyRes.statusCode).toBe(200);
@@ -31,6 +36,7 @@ describe('policy check', () => {
     const allowRes = await app.inject({
       method: 'POST',
       url: '/api/policy/check',
+      headers: { Authorization: `Bearer ${token}` },
       payload: { actor: 'architect', changedPaths: ['docs/protocols/x.md'] }
     });
     expect(allowRes.statusCode).toBe(200);
