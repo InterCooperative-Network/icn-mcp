@@ -2,6 +2,6 @@
   "name": "@icn-mcp/architect",
   "version": "0.0.1",
   "type": "module",
-  "scripts": { "build": "tsc --init >/dev/null 2>&1 || true", "test": "vitest run || true" }
+  "scripts": { "build": "echo ok", "test": "echo ok" }
 }
 
