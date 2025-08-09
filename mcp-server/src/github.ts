@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { insertArtifact } from './db.js';
 import { Octokit } from '@octokit/rest';
+import { z } from 'zod';
 
 export type LocalPrFile = { path: string; content: string };
 
@@ -98,5 +99,29 @@ export async function createPr(input: {
 
   const local = await createLocalPr(input);
   return { mode: 'local', artifact: local.artifact };
+}
+
+// Issue creation
+export const IssueCreate = z.object({
+  title: z.string(),
+  body: z.string().optional(),
+  labels: z.array(z.string()).optional()
+});
+
+export async function createIssue(input: z.infer<typeof IssueCreate>): Promise<{ mode: 'github'; url: string } | { mode: 'local'; artifact: string }>{
+  const token = process.env.GITHUB_TOKEN;
+  const owner = process.env.GITHUB_OWNER || 'InterCooperative-Network';
+  const repo = process.env.GITHUB_REPO || 'icn-mcp';
+  if (token) {
+    const octokit = new Octokit({ auth: token });
+    const { data: issue } = await octokit.issues.create({ owner, repo, title: input.title, body: input.body, labels: input.labels });
+    return { mode: 'github', url: issue.html_url };
+  }
+  // local artifact
+  const artifactsDir = path.resolve(process.cwd(), 'artifacts');
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  const file = path.join(artifactsDir, `ISSUE-${Date.now()}.json`);
+  fs.writeFileSync(file, JSON.stringify(input, null, 2), 'utf8');
+  return { mode: 'local', artifact: file };
 }
 

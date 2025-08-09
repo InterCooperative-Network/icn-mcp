@@ -100,6 +100,15 @@ export async function apiRoutes(f: FastifyInstance) {
     return reply.send({ ok: true, ...res });
   });
 
+  // Issue orchestration
+  const IssueCreateSchema = z.object({ title: z.string(), body: z.string().optional(), labels: z.array(z.string()).optional() });
+  f.post('/gh/issue/create', { preHandler: requireAuth() }, async (req, reply) => {
+    const body = IssueCreateSchema.parse(req.body);
+    const { createIssue } = await import('./github.js');
+    const res = await createIssue(body as any);
+    return reply.send({ ok: true, ...res });
+  });
+
   // Webhooks
   await webhooksRoute(f);
 
