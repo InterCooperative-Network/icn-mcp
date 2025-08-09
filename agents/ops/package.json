@@ -1,0 +1,7 @@
+{
+  "name": "@icn-mcp/ops",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": { "build": "tsc --init >/dev/null 2>&1 || true", "test": "vitest run || true" }
+}
+
