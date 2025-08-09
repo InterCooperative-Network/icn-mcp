@@ -5,7 +5,7 @@ import { request } from 'undici';
 async function main() {
   const overviewPath = path.resolve(process.cwd(), 'docs/architecture/00-overview.md');
   let contents = '';
-  try { contents = fs.readFileSync(overviewPath, 'utf8'); } catch {}
+  try { contents = fs.readFileSync(overviewPath, 'utf8'); } catch { /* noop */ }
 
   const hasIntent = contents.includes('Intent-0001');
   const tasks = [
@@ -15,7 +15,7 @@ async function main() {
   ];
   if (!hasIntent) {
     // still proceed; v0 planner is naive
-    /* noop */
+    console.log('Intent-0001 not found; proceeding with default tasks');
   }
 
   const baseUrl = process.env.MCP_BASE_URL || 'http://localhost:8787/api';
