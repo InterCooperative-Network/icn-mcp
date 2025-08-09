@@ -7,7 +7,7 @@ import { requireAuth } from './auth.js';
 export async function workersRoute(f: FastifyInstance) {
   const Claim = z.object({});
   f.post('/task/claim', { preHandler: requireAuth() }, async (req, reply) => {
-    const _ = Claim.parse(req.body || {});
+    Claim.parse(req.body ?? {});
     const task = getNextOpenTask();
     if (!task) return reply.code(200).send({ error: 'no_available_tasks' });
     markTaskClaimed(task.id, req.agent!.id);
