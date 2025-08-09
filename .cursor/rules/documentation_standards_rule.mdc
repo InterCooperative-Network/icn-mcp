@@ -1,0 +1,181 @@
+---
+description: Documentation formats and requirements
+globs: ["docs/**/*.md", "README.md", "**/*.md"]
+alwaysApply: false
+---
+
+# Documentation Standards
+
+## API Documentation Format
+**File**: `docs/api/mcp-server.md`
+
+Use this exact template for all API endpoints:
+
+```markdown
+## POST /api/endpoint/name
+
+**Purpose**: Brief description of what this endpoint does
+
+**Auth**: Required (Bearer token) | Public
+
+**Request**:
+```json
+{
+  "field": "string",
+  "optional_field": "string?",
+  "nested_object": {
+    "property": "value"
+  }
+}
+```
+
+**Response** (201):
+```json
+{
+  "ok": true,
+  "id": "uuid-here",
+  "data": {}
+}
+```
+
+**Errors**:
+- `400`: Validation failed - Invalid input format
+- `401`: Authentication required - Missing or invalid Bearer token  
+- `403`: Insufficient permissions - Policy violation
+- `404`: Resource not found
+- `500`: Internal server error
+
+**Example**:
+```bash
+curl -X POST http://localhost:8787/api/endpoint/name \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "field": "example_value",
+    "optional_field": "optional_example"
+  }'
+```
+
+**Policy Requirements**:
+- Capabilities: `task.create`, `pr.write`
+- Write scopes: `/mcp-server/**`, `/docs/**`
+```
+
+## Integration Documentation
+**Files**: `docs/integrations/github-copilot.md`, `docs/integrations/cursor.md`
+
+Required structure for integration docs:
+
+```markdown
+# Integration Name
+
+## Overview
+What this integration enables and why it's useful.
+
+## Prerequisites
+- System requirements
+- Required tools/accounts
+- Dependencies
+
+## Setup
+### 1. Environment Configuration
+```bash
+# Required environment variables
+export VARIABLE_NAME=value
+```
+
+### 2. Registration Process
+Step-by-step setup instructions with exact commands.
+
+### 3. Configuration Files
+Any config files that need to be created or modified.
+
+## Workflow
+### Standard Process
+1. Step-by-step workflow
+2. Expected inputs and outputs
+3. Error conditions and recovery
+
+### Example Session
+```bash
+# Complete example from start to finish
+command1
+command2
+```
+
+## Troubleshooting
+### Common Issues
+- **Issue**: Description of problem
+  - **Cause**: Why this happens
+  - **Solution**: How to fix it
+
+### Error Messages
+- `Error message text` - What it means and how to resolve
+
+## API Reference
+Link to relevant API documentation sections.
+```
+
+## README Updates
+Keep these sections current in the main README.md:
+
+### Required Sections
+1. **Quick Start** - How to get server running in 5 minutes
+2. **Architecture Overview** - High-level system design
+3. **API Endpoints** - List of available endpoints with links to detailed docs
+4. **Environment Variables** - All configuration options
+5. **Development Setup** - How to contribute
+6. **Integration Guides** - Links to agent integration docs
+
+### Environment Variables Documentation
+```markdown
+## Environment Variables
+
+### Required
+- `GITHUB_TOKEN` - GitHub Personal Access Token with repo scope
+- `WEBHOOK_SECRET` - Secret for GitHub webhook HMAC verification
+
+### Optional
+- `PORT` - Server port (default: 8787)
+- `DB_PATH` - SQLite database path (default: var/icn-mcp.sqlite)
+- `LOG_LEVEL` - Logging level (default: info)
+
+### GitHub Integration
+- `GITHUB_OWNER` - Repository owner (default: InterCooperative-Network)
+- `GITHUB_REPO` - Repository name (default: icn-mcp)  
+- `GITHUB_DEFAULT_BRANCH` - Default branch (default: main)
+```
+
+## Policy Documentation
+**File**: `docs/policy/format.md`
+
+Document the policy system completely:
+
+```markdown
+# Policy Rules Format
+
+## Overview
+The policy engine controls what actions agents can perform based on JSON rules.
+
+## Rules File Location
+`mcp-server/policy.rules.json`
+
+## Schema
+```json
+{
+  "no_direct_merges": true,
+  "path_caps": {
+    "actor_name": ["path/pattern/**", "specific/file.ts"]
+  },
+  "reviews_required": [
+    {
+      "paths": ["docs/protocols/**", "security/**"],
+      "reviewers": ["security"]
+    }
+  ]
+}
+```
+
+## Decision Algorithm
+1. Check `path_caps` for actor permissions
+2. Apply `reviews_required` rules for path patte

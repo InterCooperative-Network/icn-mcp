@@ -7,6 +7,7 @@ import { requireAuth } from './auth.js';
 import { tasksTotal, policyDeniesTotal, prCreatesTotal, agentsTotal } from './metrics.js';
 import crypto from 'node:crypto';
 import { webhooksRoute } from './webhooks.js';
+import { buildTaskBrief } from './context.js';
 
 export async function healthRoute(f: FastifyInstance) {
   f.get('/healthz', async () => ({ ok: true }));
@@ -100,5 +101,18 @@ export async function apiRoutes(f: FastifyInstance) {
 
   // Webhooks
   await webhooksRoute(f);
+
+  // Context briefing
+  f.get('/context/brief', async (req, reply) => {
+    const taskId = (req.query as any)?.task_id as string | undefined;
+    if (!taskId) return reply.code(400).send({ ok: false, error: 'task_id_required' });
+    try {
+      const brief = buildTaskBrief(taskId);
+      return reply.send(brief);
+    } catch (err: any) {
+      f.log.warn({ err, reqId: req.id }, 'brief generation failed');
+      return reply.code(404).send({ ok: false, error: 'not_found' });
+    }
+  });
 }
 

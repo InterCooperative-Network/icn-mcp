@@ -1,0 +1,107 @@
+---
+description: Database operations and testing patterns
+globs: ["mcp-server/src/db.ts", "mcp-server/test/**/*.ts", "db/migrations/**/*.sql"]
+alwaysApply: false
+---
+
+# Database Patterns
+
+## Migration Pattern
+- **Location**: `db/migrations/NNNN_name.sql` (e.g., `0001_init.sql`, `0002_agents.sql`)
+- **Applied automatically** on server start via `runMigrations()`
+- **Idempotent**: Safe to run multiple times
+- **Never modify existing migrations** - create new ones for changes
+
+## Helper Function Pattern
+Always create typed helper functions in `mcp-server/src/db.ts`:
+
+```typescript
+export function insertTask(input: {
+  title: string, 
+  description?: string, 
+  created_by?: string
+}): { id: string } {
+  const id = crypto.randomUUID();
+  const stmt = db.prepare(`
+    INSERT INTO tasks (id, title, description, created_by) 
+    VALUES (?, ?, ?, ?)
+  `);
+  stmt.run(id, input.title, input.description || null, input.created_by || null);
+  return { id };
+}
+
+export function listTasks(): Array<{
+  id: string, 
+  title: string, 
+  status: string, 
+  created_at: string
+}> {
+  return db.prepare(`
+    SELECT id, title, status, created_at 
+    FROM tasks 
+    ORDER BY created_at DESC
+  `).all();
+}
+
+export function getAgentByToken(token: string): Agent | null {
+  return db.prepare(`
+    SELECT id, name, kind, created_at 
+    FROM agents 
+    WHERE token = ?
+  `).get(token) || null;
+}
+```
+
+## Test Database Isolation
+Use in-memory SQLite for tests to ensure isolation:
+
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest';
+import { getDb, setTestDb } from '../src/db.js';
+
+describe('task operations', () => {
+  beforeEach(() => {
+    setTestDb(':memory:'); // Fresh DB for each test
+    // Migrations run automatically
+  });
+  
+  it('creates and retrieves tasks', () => {
+    const created = insertTask({ title: 'test task' });
+    const tasks = listTasks();
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].id).toBe(created.id);
+  });
+});
+```
+
+## Security Requirements
+- **Always use parameterized queries** (prepared statements)
+- **Never use raw SQL string concatenation**
+- **Validate inputs with Zod** before DB operations
+- **Use crypto.randomUUID()** for IDs
+- **Use crypto.randomBytes(32).toString('hex')** for tokens
+
+## Database Schema Conventions
+- **Primary keys**: Always `id TEXT PRIMARY KEY`
+- **Timestamps**: `created_at DATETIME DEFAULT CURRENT_TIMESTAMP`
+- **Foreign keys**: Reference by `id`, not auto-increment integers
+- **Nullable fields**: Explicitly specify `NULL` or `NOT NULL`
+- **Indexes**: Add for frequently queried columns
+
+## Migration Example
+```sql
+-- db/migrations/0003_add_webhooks.sql
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  processed_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_events_type 
+ON webhook_events(event_type);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_events_created 
+ON webhook_events(created_at);
+```

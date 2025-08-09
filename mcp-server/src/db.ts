@@ -77,6 +77,18 @@ export function listTasks(): TaskRow[] {
   return rows as TaskRow[];
 }
 
+export function getTaskById(id: string): TaskRow | null {
+  const db = getDb();
+  const row = db.prepare('SELECT id, title, description, status, created_at FROM tasks WHERE id = ?').get(id);
+  return (row as TaskRow) ?? null;
+}
+
+export function getTaskDeps(id: string): string[] {
+  const db = getDb();
+  const rows = db.prepare('SELECT depends_on FROM task_deps WHERE task_id = ?').all(id) as Array<{ depends_on: string }>;
+  return rows.map((r) => r.depends_on);
+}
+
 export function insertRun(input: InsertRunInput): { id: string } {
   const db = getDb();
   const id = generateId('run');
