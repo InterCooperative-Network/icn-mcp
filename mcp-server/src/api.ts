@@ -57,10 +57,15 @@ export async function apiRoutes(f: FastifyInstance) {
   initPolicyWatcher(() => f.log.info('policy rules reloaded'));
   const PolicyCheck = z.object({ actor: z.string(), changedPaths: z.array(z.string()) });
   f.post('/policy/check', async (req, reply) => {
-    const body = PolicyCheck.parse(req.body);
-    const decision = checkPolicy({ actor: body.actor, changedPaths: body.changedPaths });
-    f.log.info({ decision }, 'policy decision');
-    return reply.send(decision);
+    try {
+      const body = PolicyCheck.parse(req.body);
+      const decision = checkPolicy({ actor: body.actor, changedPaths: body.changedPaths });
+      f.log.info({ decision }, 'policy decision');
+      return reply.send(decision);
+    } catch (err: any) {
+      f.log.error({ err }, 'policy check error');
+      return reply.code(200).send({ allow: false, reasons: [String(err?.message || err)] });
+    }
   });
 
   // Local PR adapter
