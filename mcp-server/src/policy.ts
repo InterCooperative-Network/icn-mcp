@@ -37,11 +37,13 @@ export function initPolicyWatcher(onReload?: () => void) {
 }
 
 function matchGlob(glob: string, filePath: string): boolean {
-  // minimal glob: '**' → '.*', '*' → '[^/]*'
-  const escapeRegex = (s: string) => s.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
-  const pattern = escapeRegex(glob).replace(/\\\*\\\*/g, '.*').replace(/\\\*/g, '[^/]*');
-  const re = new RegExp('^' + pattern + '$');
-  return re.test(filePath);
+  if (!glob) return false;
+  if (glob.endsWith('/**')) {
+    const base = glob.slice(0, -3);
+    return filePath.startsWith(base);
+  }
+  // simple exact match fallback
+  return glob === filePath;
 }
 
 export function checkPolicy(input: { actor: string; changedPaths: string[] }): PolicyDecision {
