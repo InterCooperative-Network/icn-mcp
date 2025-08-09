@@ -25,6 +25,17 @@ export const agentsTotal = new client.Gauge({
   help: 'Number of registered agents'
 });
 
+export const webhooksInvalidSigTotal = new client.Counter({
+  name: 'icn_mcp_webhooks_invalid_signature_total',
+  help: 'Number of GitHub webhook requests with invalid signatures'
+});
+
+export const webhooksReceivedTotal = new client.Counter({
+  name: 'icn_mcp_webhooks_received_total',
+  help: 'Number of GitHub webhook events received',
+  labelNames: ['event'] as const
+});
+
 export async function metricsRoute(f: FastifyInstance) {
   f.get('/metrics', async (_req, reply) => {
     const metrics = await client.register.metrics();

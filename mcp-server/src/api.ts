@@ -6,6 +6,7 @@ import { createPr } from './github.js';
 import { requireAuth } from './auth.js';
 import { tasksTotal, policyDeniesTotal, prCreatesTotal, agentsTotal } from './metrics.js';
 import crypto from 'node:crypto';
+import { webhooksRoute } from './webhooks.js';
 
 export async function healthRoute(f: FastifyInstance) {
   f.get('/healthz', async () => ({ ok: true }));
@@ -96,5 +97,8 @@ export async function apiRoutes(f: FastifyInstance) {
     f.log.info({ mode: (res as any).mode, branch_hint: body.task_id, reqId: req.id }, 'pr create');
     return reply.send({ ok: true, ...res });
   });
+
+  // Webhooks
+  await webhooksRoute(f);
 }
 
