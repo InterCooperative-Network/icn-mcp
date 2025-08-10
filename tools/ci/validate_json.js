@@ -19,13 +19,16 @@ function stripJsonComments(content) {
  * Validate JSON files in the repository
  */
 async function validateJson() {
-  console.log('🔍 Validating JSON files...');
+  console.log('🔍 Validating JSON files recursively across all workspaces...');
   
   const jsonFiles = await glob('**/*.json', {
     ignore: ['node_modules/**', 'dist/**', '.git/**']
   });
   
+  console.log(`📊 Found ${jsonFiles.length} JSON files to validate`);
+  
   let hasErrors = false;
+  let workspaceCount = {};
   
   for (const file of jsonFiles) {
     try {
@@ -37,17 +40,27 @@ async function validateJson() {
       
       JSON.parse(jsonContent);
       console.log(`✅ ${file}`);
+      
+      // Track workspace coverage
+      const workspace = file.split('/')[0] || 'root';
+      workspaceCount[workspace] = (workspaceCount[workspace] || 0) + 1;
+      
     } catch (error) {
       console.error(`❌ ${file}: ${error.message}`);
       hasErrors = true;
     }
   }
   
+  console.log('\n📈 Workspace coverage:');
+  Object.entries(workspaceCount).forEach(([workspace, count]) => {
+    console.log(`  ${workspace}: ${count} files`);
+  });
+  
   if (hasErrors) {
     console.error('\n❌ JSON validation failed');
     process.exit(1);
   } else {
-    console.log('\n✅ All JSON files are valid');
+    console.log('\n✅ All JSON files are valid across all workspaces');
   }
 }
 
