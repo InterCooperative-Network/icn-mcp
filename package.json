@@ -1,6 +1,7 @@
 {
   "name": "icn-mcp",
   "private": true,
+  "type": "module",
   "workspaces": [
     "mcp-server",
     "mcp-node",
