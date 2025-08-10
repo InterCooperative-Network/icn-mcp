@@ -64,7 +64,6 @@ export function initPolicyWatcher(onReload?: () => void) {
       cachedRules = readRules();
       onReload?.();
     });
-  } catch {
   } catch (err) {
     // ignore watcher errors on some FS, but log for debugging
     console.error('Failed to watch policy.rules.json:', err);
@@ -75,7 +74,6 @@ export function initPolicyWatcher(onReload?: () => void) {
       cachedCodeowners = parseCodeowners();
       onReload?.();
     });
-  } catch {
   } catch (err) {
     // ignore watcher errors on some FS, but log for debugging
     console.error('Error watching CODEOWNERS file:', err);
