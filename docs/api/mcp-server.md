@@ -150,6 +150,180 @@ Response (GitHub):
 { "ok": true, "mode": "github", "url": "https://github.com/.../pull/123" }
 ```
 
+### Worker Protocol
+
+The worker protocol enables agents to claim tasks and report execution progress.
+
+#### Claim Task
+
+POST /api/task/claim
+
+Auth: Bearer token required.
+
+Request:
+
+```json
+{}
+```
+
+Response (task available):
+
+```json
+{
+  "task_id": "task_abc123",
+  "title": "Implement feature X"
+}
+```
+
+Response (no tasks available):
+
+```json
+{
+  "error": "no_available_tasks"
+}
+```
+
+curl:
+
+```bash
+curl -s http://localhost:8787/api/task/claim \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+#### Report Task Run
+
+POST /api/task/run
+
+Auth: Bearer token required.
+
+Request:
+
+```json
+{
+  "task_id": "task_abc123",
+  "status": "in_progress",
+  "notes": "Started implementation, working on core logic"
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+curl:
+
+```bash
+curl -s http://localhost:8787/api/task/run \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"task_id":"task_abc123","status":"in_progress","notes":"Starting work"}'
+```
+
+#### Get Task Status
+
+GET /api/task/status?task_id=<id>
+
+Public endpoint.
+
+Response:
+
+```json
+{
+  "id": "task_abc123",
+  "status": "claimed"
+}
+```
+
+Response (not found):
+
+```json
+{
+  "ok": false,
+  "error": "not_found"
+}
+```
+
+curl:
+
+```bash
+curl -s "http://localhost:8787/api/task/status?task_id=task_abc123"
+```
+
+### Context Briefing
+
+The context briefing endpoint provides comprehensive task context for agents.
+
+#### Get Task Brief
+
+GET /api/context/brief?task_id=<id>
+
+Public endpoint.
+
+Response:
+
+```json
+{
+  "task": {
+    "id": "task_abc123",
+    "title": "Implement feature X",
+    "acceptance": [
+      "Implements: Add new API endpoint for user management",
+      "Depends on: RFC-456"
+    ]
+  },
+  "repo": {
+    "owner": "InterCooperative-Network",
+    "repo": "icn-mcp",
+    "paths": ["mcp-server/src/**", "mcp-server/test/**"]
+  },
+  "starter_files": [
+    {
+      "path": "mcp-server/src/api.ts",
+      "hint": "Register endpoints and handlers"
+    },
+    {
+      "path": "mcp-server/src/db.ts",
+      "hint": "Add DB helpers and migrations as needed"
+    }
+  ],
+  "policy": {
+    "caps_required": [],
+    "write_scopes": ["mcp-server/**", "docs/**"]
+  },
+  "steps": [
+    "Read existing API and DB helpers",
+    "Add/update migrations and types",
+    "Implement endpoints and tests",
+    "Verify metrics and docs"
+  ],
+  "conventions": {
+    "commit_format": "feat(scope): message",
+    "test_patterns": ["mcp-server/test/**/*.test.ts"]
+  }
+}
+```
+
+Response (not found):
+
+```json
+{
+  "ok": false,
+  "error": "not_found"
+}
+```
+
+curl:
+
+```bash
+curl -s "http://localhost:8787/api/context/brief?task_id=task_abc123"
+```
+
 ### Metrics
 
 GET /metrics
