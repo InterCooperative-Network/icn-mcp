@@ -1,0 +1,110 @@
+{
+  "id": "add-mcp-tool",
+  "name": "Add MCP Tool",
+  "description": "Playbook for adding new tools to the ICN MCP server",
+  "category": "development",
+  "tags": ["mcp", "tools", "typescript"],
+  "steps": [
+    {
+      "id": "design-interface",
+      "title": "Design Tool Interface",
+      "description": "Define TypeScript interfaces for request and response",
+      "actions": [
+        "Create request interface with required parameters",
+        "Create response interface with structured data",
+        "Consider optional parameters and defaults",
+        "Add JSDoc comments for API documentation"
+      ],
+      "validation": [
+        "Interfaces follow existing patterns",
+        "All properties have appropriate types",
+        "Required vs optional parameters are clear"
+      ]
+    },
+    {
+      "id": "implement-tool",
+      "title": "Implement Tool Logic",
+      "description": "Create the tool implementation file",
+      "actions": [
+        "Create new file in mcp-node/src/tools/",
+        "Implement main function with proper error handling",
+        "Add input validation",
+        "Provide meaningful fallback data when needed"
+      ],
+      "validation": [
+        "Function handles all edge cases",
+        "Error messages are helpful",
+        "Performance is acceptable"
+      ]
+    },
+    {
+      "id": "register-tool",
+      "title": "Register Tool in System",
+      "description": "Add tool to manifest and server handlers",
+      "actions": [
+        "Add tool definition to manifest.ts",
+        "Add handler case in server.ts",
+        "Import tool function at top of server.ts",
+        "Ensure proper parameter validation"
+      ],
+      "validation": [
+        "Tool appears in tool list",
+        "Parameters are validated correctly",
+        "Response format matches schema"
+      ]
+    },
+    {
+      "id": "add-tests",
+      "title": "Add Comprehensive Tests",
+      "description": "Create tests for the new tool",
+      "actions": [
+        "Add test cases to test/tools.test.ts",
+        "Test happy path scenarios",
+        "Test error conditions",
+        "Test parameter validation"
+      ],
+      "validation": [
+        "All tests pass",
+        "Coverage includes edge cases",
+        "Tests are maintainable"
+      ]
+    },
+    {
+      "id": "verify-integration",
+      "title": "Verify Integration",
+      "description": "Test the tool end-to-end",
+      "actions": [
+        "Run npm test to verify all tests pass",
+        "Manually test tool through MCP client",
+        "Verify error handling works correctly",
+        "Check tool appears in capabilities"
+      ],
+      "validation": [
+        "Tool works in real MCP environment",
+        "Error handling is user-friendly",
+        "Performance meets requirements"
+      ]
+    }
+  ],
+  "common_pitfalls": [
+    {
+      "issue": "Forgetting to update both manifest.ts and server.ts",
+      "solution": "Always update both files when adding a new tool"
+    },
+    {
+      "issue": "Not handling missing data gracefully",
+      "solution": "Provide fallback data or clear error messages"
+    },
+    {
+      "issue": "Inconsistent parameter naming",
+      "solution": "Follow existing tool patterns for parameter names"
+    }
+  ],
+  "success_criteria": [
+    "Tool is discoverable via MCP list_tools",
+    "Tool responds correctly to valid inputs",
+    "Tool handles invalid inputs gracefully",
+    "All tests pass",
+    "Documentation is clear and complete"
+  ]
+}

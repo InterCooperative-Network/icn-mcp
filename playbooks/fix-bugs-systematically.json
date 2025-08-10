@@ -1,0 +1,119 @@
+{
+  "id": "fix-bugs-systematically",
+  "name": "Fix Bugs Systematically",
+  "description": "Playbook for systematically identifying, reproducing, and fixing bugs",
+  "category": "debugging",
+  "tags": ["debugging", "testing", "quality"],
+  "steps": [
+    {
+      "id": "reproduce-bug",
+      "title": "Reproduce the Bug",
+      "description": "Create a reliable way to reproduce the issue",
+      "actions": [
+        "Gather detailed information about the bug report",
+        "Create minimal test case that reproduces the issue",
+        "Document exact steps to reproduce",
+        "Verify the bug exists in current codebase",
+        "Test across different environments if applicable"
+      ],
+      "validation": [
+        "Bug can be reproduced consistently",
+        "Reproduction steps are documented",
+        "Root cause area is identified"
+      ]
+    },
+    {
+      "id": "analyze-root-cause",
+      "title": "Analyze Root Cause",
+      "description": "Understand the underlying cause of the bug",
+      "actions": [
+        "Use debugger to step through problematic code",
+        "Add logging to understand data flow",
+        "Review recent changes that might have introduced the bug",
+        "Check for edge cases and boundary conditions",
+        "Look for similar bugs in issue tracker"
+      ],
+      "validation": [
+        "Root cause is clearly identified",
+        "Impact of the bug is understood",
+        "Similar issues are documented"
+      ]
+    },
+    {
+      "id": "design-fix",
+      "title": "Design the Fix",
+      "description": "Plan a solution that addresses the root cause",
+      "actions": [
+        "Consider multiple solution approaches",
+        "Evaluate impact on existing functionality",
+        "Design fix to be minimal and targeted",
+        "Plan for edge cases and error handling",
+        "Consider if architecture changes are needed"
+      ],
+      "validation": [
+        "Solution addresses root cause",
+        "Risk of regression is minimized",
+        "Solution is well-scoped"
+      ]
+    },
+    {
+      "id": "implement-fix",
+      "title": "Implement the Fix",
+      "description": "Code the solution with proper testing",
+      "actions": [
+        "Implement the minimal fix required",
+        "Add or update tests to cover the bug scenario",
+        "Test the fix against the reproduction case",
+        "Run existing test suite to check for regressions",
+        "Add logging or monitoring if appropriate"
+      ],
+      "validation": [
+        "Bug is fixed in reproduction case",
+        "No new bugs are introduced",
+        "Test coverage is adequate"
+      ]
+    },
+    {
+      "id": "verify-and-monitor",
+      "title": "Verify Fix and Monitor",
+      "description": "Ensure the fix works and monitor for issues",
+      "actions": [
+        "Test fix in staging environment",
+        "Verify fix addresses original bug report",
+        "Monitor for any new issues after deployment",
+        "Document the fix and lessons learned",
+        "Update any related documentation"
+      ],
+      "validation": [
+        "Fix works in production environment",
+        "No related issues are reported",
+        "Documentation is updated"
+      ]
+    }
+  ],
+  "common_pitfalls": [
+    {
+      "issue": "Fixing symptoms instead of root cause",
+      "solution": "Always trace back to the fundamental issue causing the bug"
+    },
+    {
+      "issue": "Making changes that are too broad",
+      "solution": "Keep fixes minimal and targeted to reduce regression risk"
+    },
+    {
+      "issue": "Not testing edge cases",
+      "solution": "Test boundary conditions and error scenarios"
+    },
+    {
+      "issue": "Introducing new bugs while fixing existing ones",
+      "solution": "Run comprehensive test suite and use careful code review"
+    }
+  ],
+  "success_criteria": [
+    "Original bug is completely resolved",
+    "No regressions are introduced",
+    "Fix is well-tested and documented",
+    "Root cause is addressed, not just symptoms",
+    "Similar bugs are prevented in the future"
+  ]
+}

@@ -7,13 +7,15 @@ describe('MCP Server', () => {
       const manifest = generateToolManifest();
       
       expect(Array.isArray(manifest)).toBe(true);
-      expect(manifest.length).toBe(4);
+      expect(manifest.length).toBe(6);
       
       const toolNames = manifest.map(tool => tool.name);
       expect(toolNames).toContain('icn_get_architecture');
       expect(toolNames).toContain('icn_get_invariants');
       expect(toolNames).toContain('icn_check_policy');
       expect(toolNames).toContain('icn_get_task_context');
+      expect(toolNames).toContain('icn_get_similar_prs');
+      expect(toolNames).toContain('icn_suggest_approach');
       
       // Check tool structure
       for (const tool of manifest) {
@@ -34,6 +36,12 @@ describe('MCP Server', () => {
       
       const taskContextTool = manifest.find(tool => tool.name === 'icn_get_task_context');
       expect(taskContextTool?.inputSchema.required).toContain('taskId');
+      
+      const similarPrsTool = manifest.find(tool => tool.name === 'icn_get_similar_prs');
+      expect(similarPrsTool?.inputSchema.required).toContain('description');
+      
+      const suggestApproachTool = manifest.find(tool => tool.name === 'icn_suggest_approach');
+      expect(suggestApproachTool?.inputSchema.required).toContain('task_description');
     });
   });
 });
