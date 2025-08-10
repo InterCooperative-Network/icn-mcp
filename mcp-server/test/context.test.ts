@@ -4,9 +4,10 @@ import { healthRoute, apiRoutes } from '../src/api.js';
 import { insertTask, insertDep } from '../src/db.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'crypto';
 
 describe('context brief', () => {
-  const testDb = path.resolve(process.cwd(), `var/test-${Date.now()}-${Math.random()}.sqlite`);
+  const testDb = path.resolve(process.cwd(), `var/test-${Date.now()}-${randomUUID()}.sqlite`);
   beforeEach(() => {
     process.env.MCP_DB_PATH = testDb;
     try { fs.unlinkSync(testDb); } catch {/* noop */}
@@ -32,7 +33,7 @@ describe('context brief', () => {
 
   it('returns complete brief structure with all required fields', async () => {
     // Use a unique DB path for this test to avoid interference
-    const uniqueTestDb = path.resolve(process.cwd(), `var/test-brief-${Date.now()}-${Math.random()}.sqlite`);
+    const uniqueTestDb = path.resolve(process.cwd(), `var/test-brief-${Date.now()}-${randomUUID()}.sqlite`);
     process.env.MCP_DB_PATH = uniqueTestDb;
     try { fs.unlinkSync(uniqueTestDb); } catch {/* noop */}
     

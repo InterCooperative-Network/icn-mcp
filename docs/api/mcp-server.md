@@ -54,7 +54,7 @@ Response:
 curl:
 
 ```bash
-curl -s http://localhost:8787/api/agent/register \
+curl -X POST http://localhost:8787/api/agent/register \
   -H 'Content-Type: application/json' \
   -d '{"name":"Planner A","kind":"planner"}'
 ```
@@ -80,7 +80,7 @@ Response:
 curl:
 
 ```bash
-curl -s http://localhost:8787/api/task/create \
+curl -X POST http://localhost:8787/api/task/create \
   -H 'Authorization: Bearer TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{"title":"Draft docs"}'
@@ -115,7 +115,7 @@ Response:
 curl:
 
 ```bash
-curl -s http://localhost:8787/api/policy/check \
+curl -X POST http://localhost:8787/api/policy/check \
   -H 'Authorization: Bearer TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{"actor":"architect","changedPaths":["docs/file.md"]}'
@@ -186,7 +186,7 @@ Response (no tasks available):
 curl:
 
 ```bash
-curl -s http://localhost:8787/api/task/claim \
+curl -X POST http://localhost:8787/api/task/claim \
   -H 'Authorization: Bearer TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{}'
@@ -219,7 +219,7 @@ Response:
 curl:
 
 ```bash
-curl -s http://localhost:8787/api/task/run \
+curl -X POST http://localhost:8787/api/task/run \
   -H 'Authorization: Bearer TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{"task_id":"task_abc123","status":"in_progress","notes":"Starting work"}'
@@ -252,7 +252,8 @@ Response (not found):
 curl:
 
 ```bash
-curl -s "http://localhost:8787/api/task/status?task_id=task_abc123"
+curl -X GET "http://localhost:8787/api/task/status?task_id=task_abc123" \
+  -H 'Authorization: Bearer TOKEN'
 ```
 
 ### Context Briefing
@@ -321,7 +322,8 @@ Response (not found):
 curl:
 
 ```bash
-curl -s "http://localhost:8787/api/context/brief?task_id=task_abc123"
+curl -X GET "http://localhost:8787/api/context/brief?task_id=task_abc123" \
+  -H 'Authorization: Bearer TOKEN'
 ```
 
 ### Metrics
