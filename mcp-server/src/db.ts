@@ -10,7 +10,7 @@ export type InsertTaskInput = { title: string; description?: string; created_by?
 export type TaskRow = { id: string; title: string; description: string | null; status: string; created_at: string };
 export type InsertRunInput = { task_id: string; agent: string; status: string; notes?: string };
 export type InsertArtifactInput = { task_id: string; kind: string; path: string; meta?: unknown };
-export type AgentRow = { id: string; name: string; kind: string; token: string; created_at: string };
+export type AgentRow = { id: string; name: string; kind: string; token: string; created_at: string; expires_at?: string };
 export type InsertWebhookEventInput = {
   event: string; delivery?: string; action?: string; repo?: string; sender?: string; payload?: unknown
 };
@@ -112,17 +112,19 @@ export function insertDep(input: { task_id: string; depends_on: string }): void 
 }
 
 // Agents
-export function insertAgent(input: { id?: string; name: string; kind: string; token: string }): { id: string; token: string } {
+export function insertAgent(input: { id?: string; name: string; kind: string; token: string; expiresInHours?: number }): { id: string; token: string } {
   const db = getDb();
   const id = input.id ?? generateId('agent');
-  db.prepare('INSERT INTO agents (id, name, kind, token) VALUES (?, ?, ?, ?)')
-    .run(id, input.name, input.kind, input.token);
+  const expiresInHours = input.expiresInHours ?? 24; // Default 24 hours
+  db.prepare('INSERT INTO agents (id, name, kind, token, expires_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'+\' || ? || \' hours\'))')
+    .run(id, input.name, input.kind, input.token, expiresInHours);
   return { id, token: input.token };
 }
 
 export function getAgentByToken(token: string): AgentRow | null {
   const db = getDb();
-  const row = db.prepare('SELECT id, name, kind, token, created_at FROM agents WHERE token = ?').get(token);
+  // Only return agents with valid (non-expired) tokens
+  const row = db.prepare('SELECT id, name, kind, token, created_at, expires_at FROM agents WHERE token = ? AND (expires_at IS NULL OR expires_at > datetime(\'now\'))').get(token);
   return (row as AgentRow) ?? null;
 }
 
@@ -135,6 +137,25 @@ export function countAgents(): number {
     // If table does not exist yet during bootstrap, treat as zero agents
     return 0;
   }
+}
+
+export function refreshAgentToken(agentId: string, newToken: string, expiresInHours: number = 24): boolean {
+  const db = getDb();
+  const result = db.prepare('UPDATE agents SET token = ?, expires_at = datetime(\'now\', \'+\' || ? || \' hours\') WHERE id = ?')
+    .run(newToken, expiresInHours, agentId);
+  return result.changes > 0;
+}
+
+export function getAgentById(agentId: string): AgentRow | null {
+  const db = getDb();
+  const row = db.prepare('SELECT id, name, kind, token, created_at, expires_at FROM agents WHERE id = ?').get(agentId);
+  return (row as AgentRow) ?? null;
+}
+
+export function cleanupExpiredTokens(): number {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM agents WHERE expires_at IS NOT NULL AND expires_at <= datetime(\'now\')').run();
+  return result.changes;
 }
 
 export function insertWebhookEvent(input: InsertWebhookEventInput): { id: string } {

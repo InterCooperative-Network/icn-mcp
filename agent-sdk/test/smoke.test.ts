@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { registerAgent, createTask } from '../src/index.js';
+import { registerAgent, createTask, refreshToken } from '../src/index.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -104,6 +104,45 @@ describe('agent-sdk', () => {
       await expect(createTask('http://localhost:8787', 'invalid_token', {
         title: 'Test Task'
       })).rejects.toThrow('Failed to create task: 401 Unauthorized');
+    });
+  });
+
+  describe('refreshToken', () => {
+    it('successfully refreshes a token', async () => {
+      const mockResponse = {
+        ok: true,
+        token: 'new_test_token_789'
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse)
+      });
+
+      const result = await refreshToken('http://localhost:8787', 'old_token');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8787/api/agent/refresh',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer old_token',
+          },
+        }
+      );
+
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('throws error on failed token refresh', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized'
+      });
+
+      await expect(refreshToken('http://localhost:8787', 'invalid_token')).rejects.toThrow('Failed to refresh token: 401 Unauthorized');
     });
   });
 });

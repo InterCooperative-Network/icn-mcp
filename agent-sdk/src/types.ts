@@ -20,3 +20,8 @@ export type TaskCreateResponse = {
   id: string;
 };
 
+export type TokenRefreshResponse = {
+  ok: boolean;
+  token: string;
+};
+
