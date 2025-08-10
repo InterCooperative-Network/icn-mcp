@@ -65,7 +65,9 @@ export function initPolicyWatcher(onReload?: () => void) {
       onReload?.();
     });
   } catch {
-    // ignore watcher errors on some FS
+  } catch (err) {
+    // ignore watcher errors on some FS, but log for debugging
+    console.error('Failed to watch policy.rules.json:', err);
   }
   
   try {
