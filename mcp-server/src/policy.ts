@@ -29,7 +29,8 @@ function readRules(): PolicyRules {
     }
     
     return rules;
-  } catch {
+  } catch (err) {
+    console.error('Failed to read or parse policy.rules.json:', err);
     return { no_direct_merges: true, path_caps: {}, reviews_required: [], codeowners_integration: false };
   }
 }
