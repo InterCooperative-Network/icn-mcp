@@ -133,7 +133,7 @@ const dashboardHTML = `
             card.className = 'metric-card';
             card.innerHTML = \`
                 <div class="metric-title">\${title}</div>
-                <div class="metric-value">\${value}</div>
+                <div class="metric-value">${value}</div>
                 <div class="metric-description">${description}</div>
             \`;
             return card;
