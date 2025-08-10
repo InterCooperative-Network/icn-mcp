@@ -1,6 +1,5 @@
 import { test, expect } from 'vitest';
 import fs from 'node:fs';
-import path from 'node:path';
 import { DB_DIR, DB_PATH, MIGRATIONS_DIR } from '../src/config.js';
 
 test('mcp-server config provides correct paths', () => {

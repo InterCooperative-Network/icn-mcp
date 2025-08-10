@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { POLICY_RULES_PATH, CODEOWNERS_PATH } from '../config.js';
 
 export interface PolicyCheckRequest {
