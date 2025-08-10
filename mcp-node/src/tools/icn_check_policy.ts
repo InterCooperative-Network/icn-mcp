@@ -1,36 +1,36 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { POLICY_RULES_PATH, CODEOWNERS_PATH } from '../config.js';
 
-export type PolicyRules = {
+export interface PolicyCheckRequest {
+  changeset: string[];
+  actor?: string;
+}
+
+export interface PolicyResponse {
+  allow: boolean;
+  reasons: string[];
+  suggestions: string[];
+}
+
+interface PolicyRules {
   no_direct_merges?: boolean;
   path_caps?: Record<string, string[]>;
   reviews_required?: Array<{ paths: string[]; reviewers: string[] }>;
   codeowners_integration?: boolean;
-};
+}
 
-export type PolicyDecision = {
+interface PolicyDecision {
   allow: boolean;
   reasons: string[];
-};
+}
 
-const RULES_PATH = path.resolve(process.cwd(), 'policy.rules.json');
-const CODEOWNERS_PATH = path.resolve(process.cwd(), '../CODEOWNERS');
-let cachedRules: PolicyRules | null = null;
-let cachedCodeowners: Map<string, string[]> | null = null;
-
-function readRules(): PolicyRules {
+function readPolicyRules(): PolicyRules {
   try {
-    const data = fs.readFileSync(RULES_PATH, 'utf8');
-    const rules = JSON.parse(data) as PolicyRules;
-    
-    // Disable CODEOWNERS integration in test environments to avoid interference
-    if (process.env.NODE_ENV === 'test' || process.env.MCP_DB_PATH?.includes('test')) {
-      rules.codeowners_integration = false;
-    }
-    
-    return rules;
+    const data = fs.readFileSync(POLICY_RULES_PATH, 'utf8');
+    return JSON.parse(data) as PolicyRules;
   } catch (err) {
-    console.error('Failed to read or parse policy.rules.json:', err);
+    console.error('Failed to read policy.rules.json:', err);
     return { no_direct_merges: true, path_caps: {}, reviews_required: [], codeowners_integration: false };
   }
 }
@@ -53,31 +53,6 @@ function parseCodeowners(): Map<string, string[]> {
     // CODEOWNERS file doesn't exist or can't be read
   }
   return codeowners;
-}
-
-export function initPolicyWatcher(onReload?: () => void) {
-  cachedRules = readRules();
-  cachedCodeowners = parseCodeowners();
-  
-  try {
-    fs.watch(RULES_PATH, { persistent: false }, () => {
-      cachedRules = readRules();
-      onReload?.();
-    });
-  } catch (err) {
-    // ignore watcher errors on some FS, but log for debugging
-    console.error('Failed to watch policy.rules.json:', err);
-  }
-  
-  try {
-    fs.watch(CODEOWNERS_PATH, { persistent: false }, () => {
-      cachedCodeowners = parseCodeowners();
-      onReload?.();
-    });
-  } catch (err) {
-    // ignore watcher errors on some FS, but log for debugging
-    console.error('Error watching CODEOWNERS file:', err);
-  }
 }
 
 function matchGlob(glob: string, filePath: string): boolean {
@@ -104,8 +79,8 @@ function matchGlob(glob: string, filePath: string): boolean {
   return glob === filePath || filePath.startsWith(glob + '/');
 }
 
-export function checkPolicy(input: { actor: string; changedPaths: string[] }): PolicyDecision {
-  const rules = cachedRules ?? readRules();
+function checkPolicyInternal(input: { actor: string; changedPaths: string[] }): PolicyDecision {
+  const rules = readPolicyRules();
   const reasons: string[] = [];
 
   // path capabilities enforcement
@@ -119,7 +94,7 @@ export function checkPolicy(input: { actor: string; changedPaths: string[] }): P
 
   // CODEOWNERS integration (only if enabled)
   if (rules.codeowners_integration) {
-    const codeowners = cachedCodeowners ?? parseCodeowners();
+    const codeowners = parseCodeowners();
     if (codeowners.size > 0) {
       for (const path of input.changedPaths) {
         for (const [pattern, owners] of codeowners.entries()) {
@@ -151,3 +126,37 @@ export function checkPolicy(input: { actor: string; changedPaths: string[] }): P
   return { allow: reasons.length === 0, reasons };
 }
 
+export async function icnCheckPolicy(request: PolicyCheckRequest): Promise<PolicyResponse> {
+  const actor = request.actor || 'unknown';
+  
+  // Use the policy checker logic
+  const decision: PolicyDecision = checkPolicyInternal({
+    actor,
+    changedPaths: request.changeset
+  });
+  
+  // Generate suggestions based on the policy violations
+  const suggestions: string[] = [];
+  
+  if (!decision.allow) {
+    for (const reason of decision.reasons) {
+      if (reason.includes('path') && reason.includes('not allowed')) {
+        suggestions.push('Consider requesting permission or modifying files within your authorized paths');
+      } else if (reason.includes('CODEOWNERS')) {
+        suggestions.push('Request review from the appropriate code owners before proceeding');
+      } else if (reason.includes('review required')) {
+        suggestions.push('Ensure required reviewers have approved the changes');
+      }
+    }
+    
+    if (suggestions.length === 0) {
+      suggestions.push('Review the policy violations and adjust the changeset accordingly');
+    }
+  }
+  
+  return {
+    allow: decision.allow,
+    reasons: decision.reasons,
+    suggestions
+  };
+}
