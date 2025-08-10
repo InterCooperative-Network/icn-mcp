@@ -89,7 +89,7 @@ const dashboardHTML = `
         }
 
         function parsePrometheusMetrics(text) {
-            const lines = text.split('\\n');
+            const lines = text.split('\n');
             const metrics = {};
             
             for (const line of lines) {
