@@ -39,6 +39,8 @@ POST /api/agent/register
 
 Bootstrap: allowed without token only if no agents exist.
 
+**Security**: Tokens expire after 24 hours and must be refreshed using `/api/agent/refresh`.
+
 Request:
 
 ```json
@@ -57,6 +59,33 @@ curl:
 curl -X POST http://localhost:8787/api/agent/register \
   -H 'Content-Type: application/json' \
   -d '{"name":"Planner A","kind":"planner"}'
+```
+
+### Refresh Token
+
+POST /api/agent/refresh
+
+Auth: Bearer token required. Extends token expiration by 24 hours.
+
+Request:
+
+```json
+{}
+```
+
+Response:
+
+```json
+{ "ok": true, "token": "new_token_..." }
+```
+
+curl:
+
+```bash
+curl -X POST http://localhost:8787/api/agent/refresh \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{}'
 ```
 
 ### Create Task
@@ -154,11 +183,13 @@ Response (GitHub):
 
 The worker protocol enables agents to claim tasks and report execution progress.
 
+**Security**: All worker operations include policy checks based on agent kind and simulated file paths.
+
 #### Claim Task
 
 POST /api/task/claim
 
-Auth: Bearer token required.
+Auth: Bearer token required. Policy checks enforce agent permissions.
 
 Request:
 
@@ -183,6 +214,15 @@ Response (no tasks available):
 }
 ```
 
+Response (policy denied):
+
+```json
+{
+  "error": "policy_denied",
+  "reasons": ["path docs/x.md not allowed for actor ops"]
+}
+```
+
 curl:
 
 ```bash
@@ -196,7 +236,7 @@ curl -X POST http://localhost:8787/api/task/claim \
 
 POST /api/task/run
 
-Auth: Bearer token required.
+Auth: Bearer token required. Policy checks enforce agent permissions.
 
 Request:
 
@@ -213,6 +253,16 @@ Response:
 ```json
 {
   "ok": true
+}
+```
+
+Response (policy denied):
+
+```json
+{
+  "ok": false,
+  "error": "policy_denied",
+  "reasons": ["path src/generated/x.ts not allowed for actor planner"]
 }
 ```
 
