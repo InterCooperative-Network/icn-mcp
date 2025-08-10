@@ -63,6 +63,59 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['taskId']
       }
+    },
+    {
+      name: 'icn_get_similar_prs',
+      description: 'Mine past PRs to find similar patterns and approaches for the current task',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            description: 'Description of the current task or feature being implemented'
+          },
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of files being modified to find relevant PR patterns'
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum number of similar PRs to return (default: 5)',
+            minimum: 1,
+            maximum: 20
+          }
+        },
+        required: ['description']
+      }
+    },
+    {
+      name: 'icn_suggest_approach',
+      description: 'Suggest implementation approaches using ICN playbooks and best practices',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task_description: {
+            type: 'string',
+            description: 'Description of the task or feature to implement'
+          },
+          files_to_modify: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of files that will be modified'
+          },
+          constraints: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of constraints or requirements'
+          },
+          context: {
+            type: 'string',
+            description: 'Optional additional context about the task'
+          }
+        },
+        required: ['task_description']
+      }
     }
   ];
 }
