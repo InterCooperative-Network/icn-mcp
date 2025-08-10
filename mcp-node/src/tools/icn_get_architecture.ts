@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { DOCS_ROOT } from '../config.js';
 
 export interface ArchitectureSection {
   title: string;
@@ -14,9 +15,8 @@ export interface ArchitectureResponse {
 export async function icnGetArchitecture(task?: string): Promise<ArchitectureResponse> {
   const sections: ArchitectureSection[] = [];
   
-  const docsRoot = path.resolve(process.cwd(), '../docs');
-  const architectureDocs = path.join(docsRoot, 'architecture');
-  const protocolDocs = path.join(docsRoot, 'protocols');
+  const architectureDocs = path.join(DOCS_ROOT, 'architecture');
+  const protocolDocs = path.join(DOCS_ROOT, 'protocols');
   
   // Read architecture docs
   try {

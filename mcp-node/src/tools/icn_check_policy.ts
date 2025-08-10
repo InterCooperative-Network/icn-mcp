@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { POLICY_RULES_PATH, CODEOWNERS_PATH } from '../config.js';
 
 export interface PolicyCheckRequest {
   changeset: string[];
@@ -26,8 +27,7 @@ interface PolicyDecision {
 
 function readPolicyRules(): PolicyRules {
   try {
-    const rulesPath = path.resolve(process.cwd(), '../mcp-server/policy.rules.json');
-    const data = fs.readFileSync(rulesPath, 'utf8');
+    const data = fs.readFileSync(POLICY_RULES_PATH, 'utf8');
     return JSON.parse(data) as PolicyRules;
   } catch (err) {
     console.error('Failed to read policy.rules.json:', err);
@@ -38,8 +38,7 @@ function readPolicyRules(): PolicyRules {
 function parseCodeowners(): Map<string, string[]> {
   const codeowners = new Map<string, string[]>();
   try {
-    const codeownersPath = path.resolve(process.cwd(), '../CODEOWNERS');
-    const data = fs.readFileSync(codeownersPath, 'utf8');
+    const data = fs.readFileSync(CODEOWNERS_PATH, 'utf8');
     const lines = data.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
     
     for (const line of lines) {

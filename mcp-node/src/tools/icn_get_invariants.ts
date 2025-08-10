@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { DOCS_ROOT } from '../config.js';
 
 export interface Invariant {
   id: string;
@@ -15,8 +16,7 @@ export interface InvariantsResponse {
 export async function icnGetInvariants(): Promise<InvariantsResponse> {
   const invariants: Invariant[] = [];
   
-  const docsRoot = path.resolve(process.cwd(), '../docs');
-  const catalogPath = path.join(docsRoot, 'invariants', 'catalog.md');
+  const catalogPath = path.join(DOCS_ROOT, 'invariants', 'catalog.md');
   
   try {
     const content = fs.readFileSync(catalogPath, 'utf8');

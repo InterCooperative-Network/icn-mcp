@@ -1,13 +1,13 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-// Default to repo-root paths when running under workspace (cwd = mcp-server)
-const defaultDbPath = path.resolve(process.cwd(), '../var/icn-mcp.sqlite');
-const MIGRATIONS_DIR = path.resolve(process.cwd(), '../db/migrations');
+import { DB_PATH, DB_DIR, MIGRATIONS_DIR } from '../../dist/src/config.js';
+
 let dbInstance = null;
 let dbPathInUse = null;
+
 export function getDb() {
-    const resolvedPath = process.env.MCP_DB_PATH || defaultDbPath;
+    const resolvedPath = process.env.MCP_DB_PATH || DB_PATH;
     if (dbInstance && dbPathInUse === resolvedPath)
         return dbInstance;
     // If switching DBs between tests, close previous
@@ -40,7 +40,7 @@ function applyMigrations(db) {
     }
     catch {
         // Fallback: apply initial schema if directory missing
-        const initPath = path.resolve(process.cwd(), '../db/migrations/0001_init.sql');
+        const initPath = path.join(MIGRATIONS_DIR, '0001_init.sql');
         if (fs.existsSync(initPath)) {
             const sql = fs.readFileSync(initPath, 'utf8');
             db.exec(sql);

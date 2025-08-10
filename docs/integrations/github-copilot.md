@@ -44,7 +44,30 @@ Configure the MCP server in your repository settings or development environment:
 }
 ```
 
-### 3. Verify Connection
+### 3. Environment Variables (Optional)
+
+The MCP server supports configuration via environment variables:
+
+**Path Configuration:**
+- `REPO_ROOT`: Override the detected repository root path
+- `DOCS_ROOT`: Override the documentation directory (default: `{REPO_ROOT}/docs`)
+- `POLICY_RULES_PATH`: Override policy rules file location (default: `{REPO_ROOT}/mcp-server/policy.rules.json`)
+- `CODEOWNERS_PATH`: Override CODEOWNERS file location (default: `{REPO_ROOT}/CODEOWNERS`)
+
+**Database Configuration:**
+- `MCP_DB_DIR`: Override database directory (default: `{REPO_ROOT}/var`)
+- `MCP_DB_PATH`: Override specific database file path (default: `{MCP_DB_DIR}/icn-mcp.sqlite`)
+- `MCP_MIGRATIONS_DIR`: Override migrations directory (default: `{REPO_ROOT}/db/migrations`)
+
+**Example .env configuration:**
+```bash
+# Override paths for development
+DOCS_ROOT=/custom/docs/path
+MCP_DB_DIR=/tmp/icn-mcp-dev
+POLICY_RULES_PATH=/custom/policies/rules.json
+```
+
+### 4. Verify Connection
 
 Once configured, GitHub Copilot can use the ICN tools to understand your development context and provide more relevant suggestions.
 
