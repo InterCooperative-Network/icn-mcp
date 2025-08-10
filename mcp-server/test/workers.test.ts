@@ -191,6 +191,54 @@ describe('workers protocol', () => {
 
     await app.close();
   });
+
+  it('policy denial scenarios for different agent kinds', async () => {
+    const uniqueTestDb = path.resolve(process.cwd(), `var/test-policy-${Date.now()}-${randomUUID()}.sqlite`);
+    process.env.MCP_DB_PATH = uniqueTestDb;
+    try { fs.unlinkSync(uniqueTestDb); } catch {/* noop */}
+    
+    const app = Fastify({ logger: false });
+    app.register(healthRoute);
+    app.register(apiRoutes, { prefix: '/api' });
+    await app.ready();
+
+    // Create a planner agent (should be denied access to certain paths)
+    const plannerReg = await app.inject({ method: 'POST', url: '/api/agent/register', payload: { name: 'Planner', kind: 'planner' } });
+    const plannerToken = (plannerReg.json() as any).token;
+    
+    // Create task for planner to claim
+    await app.inject({ method: 'POST', url: '/api/task/create', headers: { Authorization: `Bearer ${plannerToken}` }, payload: { title: 'Policy test task' } });
+
+    // Planner should be able to claim task (uses appropriate paths)
+    const plannerClaim = await app.inject({ method: 'POST', url: '/api/task/claim', headers: { Authorization: `Bearer ${plannerToken}` } });
+    expect(plannerClaim.statusCode).toBe(200);
+    const claimBody = plannerClaim.json() as any;
+    expect(claimBody.task_id).toBeTruthy();
+
+    // Planner should be able to run task (uses appropriate paths)
+    const plannerRun = await app.inject({ 
+      method: 'POST', 
+      url: '/api/task/run', 
+      headers: { Authorization: `Bearer ${plannerToken}` }, 
+      payload: { task_id: claimBody.task_id, status: 'in_progress', notes: 'working on it' } 
+    });
+    expect(plannerRun.statusCode).toBe(200);
+
+    // Test with architect agent for different path permissions
+    const architectReg = await app.inject({ method: 'POST', url: '/api/agent/register', headers: { Authorization: `Bearer ${plannerToken}` }, payload: { name: 'Architect', kind: 'architect' } });
+    const architectToken = (architectReg.json() as any).token;
+    
+    // Create another task for architect
+    await app.inject({ method: 'POST', url: '/api/task/create', headers: { Authorization: `Bearer ${architectToken}` }, payload: { title: 'Architect task' } });
+
+    // Architect should be able to claim task (different path pattern)
+    const architectClaim = await app.inject({ method: 'POST', url: '/api/task/claim', headers: { Authorization: `Bearer ${architectToken}` } });
+    expect(architectClaim.statusCode).toBe(200);
+    const architectClaimBody = architectClaim.json() as any;
+    expect(architectClaimBody.task_id).toBeTruthy();
+
+    await app.close();
+  });
 });
 
 

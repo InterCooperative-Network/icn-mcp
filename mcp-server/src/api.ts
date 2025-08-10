@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { insertTask, listTasks, insertDep, insertAgent, countAgents, refreshAgentToken, getAgentById, cleanupExpiredTokens } from './db.js';
+import { insertTask, listTasks, insertDep, insertAgent, countAgents, refreshAgentToken, cleanupExpiredTokens } from './db.js';
 import { checkPolicy, initPolicyWatcher } from './policy.js';
 import { createPr } from './github.js';
 import { requireAuth } from './auth.js';

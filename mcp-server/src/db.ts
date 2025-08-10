@@ -159,7 +159,7 @@ export function cleanupExpiredTokens(): number {
 }
 
 // Task claiming and status
-export function getAvailableTask(agentKind: string): TaskRow | null {
+export function getAvailableTask(): TaskRow | null {
   const db = getDb();
   // Get tasks that are open and not claimed by anyone, with no unmet dependencies
   const row = db.prepare(`
@@ -183,7 +183,7 @@ export function getAvailableTask(agentKind: string): TaskRow | null {
   return (row as TaskRow) ?? null;
 }
 
-export function claimTask(taskId: string, agentId: string, agentKind: string): boolean {
+export function claimTask(taskId: string, agentId: string): boolean {
   const db = getDb();
   // First check if task is still available
   const task = db.prepare('SELECT id FROM tasks WHERE id = ? AND status = \'open\'').get(taskId);
@@ -196,7 +196,7 @@ export function claimTask(taskId: string, agentId: string, agentKind: string): b
   // Create a run record to claim the task
   const runId = generateId('run');
   db.prepare('INSERT INTO task_runs (id, task_id, agent, status, notes) VALUES (?, ?, ?, \'claimed\', ?)')
-    .run(runId, taskId, agentId, `Task claimed by ${agentKind} agent`);
+    .run(runId, taskId, agentId, `Task claimed by agent`);
   
   return true;
 }

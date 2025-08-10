@@ -17,6 +17,7 @@ import { icnSuggestApproach } from './tools/icn_suggest_approach.js';
 
 class ICNMCPServer {
   private server: Server;
+  private healthCheckInterval?: ReturnType<typeof setInterval>;
 
   constructor() {
     this.server = new Server(
@@ -191,12 +192,18 @@ class ICNMCPServer {
     // Handle process signals gracefully
     process.on('SIGINT', async () => {
       console.error('[MCP] Received SIGINT, shutting down gracefully...');
+      if (this.healthCheckInterval) {
+        clearInterval(this.healthCheckInterval);
+      }
       await this.server.close();
       process.exit(0);
     });
 
     process.on('SIGTERM', async () => {
       console.error('[MCP] Received SIGTERM, shutting down gracefully...');
+      if (this.healthCheckInterval) {
+        clearInterval(this.healthCheckInterval);
+      }
       await this.server.close();
       process.exit(0);
     });
@@ -255,7 +262,7 @@ class ICNMCPServer {
       console.error('ICN MCP Server running on stdio');
       
       // Keep the process alive and handle any connection issues
-      setInterval(() => {
+      this.healthCheckInterval = setInterval(() => {
         // Periodic health check - if stdin/stdout are closed, we should exit
         if (process.stdin.destroyed || process.stdout.destroyed) {
           console.error('[MCP] Stdio streams destroyed, exiting...');

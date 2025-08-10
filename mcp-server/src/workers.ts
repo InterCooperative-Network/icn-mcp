@@ -6,6 +6,21 @@ import { requireAuth } from './auth.js';
 import { checkPolicy } from './policy.js';
 import { policyDeniesTotal } from './metrics.js';
 
+function getAgentPaths(agentKind: string, taskId: string): string[] {
+  switch (agentKind) {
+    case 'planner':
+      return [`tasks/${taskId}`, `docs/tasks/${taskId}.md`];
+    case 'architect':
+      return [`docs/architecture/${taskId}.md`, `mcp-server/src/types.ts`];
+    case 'reviewer':
+      return [`docs/${taskId}.md`, `.github/workflows/${taskId}.yml`];
+    case 'ops':
+      return [`.github/workflows/${taskId}.yml`, `tools/ci/${taskId}.js`];
+    default:
+      return [`docs/${taskId}.md`];
+  }
+}
+
 export async function workersRoute(f: FastifyInstance) {
   const Claim = z.object({});
   f.post('/task/claim', { preHandler: requireAuth() }, async (req, reply) => {
@@ -19,23 +34,7 @@ export async function workersRoute(f: FastifyInstance) {
     if (!task) return reply.code(200).send({ error: 'no_available_tasks' });
     
     // Policy check before claiming the task (use appropriate paths based on agent kind)
-    let simulatedPaths: string[] = [];
-    switch (req.agent.kind) {
-      case 'planner':
-        simulatedPaths = [`tasks/${task.id}`, `docs/tasks/${task.id}.md`];
-        break;
-      case 'architect':
-        simulatedPaths = [`docs/architecture/${task.id}.md`, `mcp-server/src/types.ts`];
-        break;
-      case 'reviewer':
-        simulatedPaths = [`docs/${task.id}.md`, `.github/workflows/${task.id}.yml`];
-        break;
-      case 'ops':
-        simulatedPaths = [`.github/workflows/${task.id}.yml`, `tools/ci/${task.id}.js`];
-        break;
-      default:
-        simulatedPaths = [`docs/${task.id}.md`];
-    }
+    const simulatedPaths = getAgentPaths(req.agent.kind, task.id);
     const decision = checkPolicy({ actor: req.agent.kind, changedPaths: simulatedPaths });
     
     if (!decision.allow) {
@@ -62,23 +61,7 @@ export async function workersRoute(f: FastifyInstance) {
     }
     
     // Policy check on task execution (use appropriate paths based on agent kind)
-    let simulatedPaths: string[] = [];
-    switch (req.agent.kind) {
-      case 'planner':
-        simulatedPaths = [`tasks/${body.task_id}`, `docs/tasks/${body.task_id}.md`];
-        break;
-      case 'architect':
-        simulatedPaths = [`docs/architecture/${body.task_id}.md`, `mcp-server/src/types.ts`];
-        break;
-      case 'reviewer':
-        simulatedPaths = [`docs/${body.task_id}.md`, `.github/workflows/${body.task_id}.yml`];
-        break;
-      case 'ops':
-        simulatedPaths = [`.github/workflows/${body.task_id}.yml`, `tools/ci/${body.task_id}.js`];
-        break;
-      default:
-        simulatedPaths = [`docs/${body.task_id}.md`];
-    }
+    const simulatedPaths = getAgentPaths(req.agent.kind, body.task_id);
     const decision = checkPolicy({ actor: req.agent.kind, changedPaths: simulatedPaths });
     
     if (!decision.allow) {
