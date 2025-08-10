@@ -190,7 +190,7 @@ function isStepApplicable(step: any, taskText: string, fileTypes: { [key: string
 function generateApproachSuggestions(
   taskText: string, 
   fileTypes: { [key: string]: number }, 
-  constraints: string[]
+  _constraints: string[]
 ): ApproachSuggestion[] {
   const approaches: ApproachSuggestion[] = [];
   
@@ -269,7 +269,7 @@ function extractKeyConsiderations(
   const considerations = new Set<string>();
   
   // Add considerations from top playbooks
-  playbooks.slice(0, 2).forEach(playbook => {
+  playbooks.slice(0, 2).forEach(_playbook => {
     // These would come from the playbook's common_pitfalls in a real implementation
     considerations.add("Follow established patterns and conventions");
     considerations.add("Test incrementally as you build");
