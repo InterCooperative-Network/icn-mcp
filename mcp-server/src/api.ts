@@ -43,6 +43,7 @@ export async function apiRoutes(f: FastifyInstance) {
     const token = crypto.randomBytes(32).toString('hex');
     const { id } = insertAgent({ name: body.name, kind: body.kind, token });
     agentsTotal.set(countAgents());
+    req.log.info({ reqId: req.id, agentId: id, agentName: body.name, agentKind: body.kind }, 'agent registered');
     return reply.code(200).send({ ok: true, id, token });
   });
 
@@ -53,6 +54,7 @@ export async function apiRoutes(f: FastifyInstance) {
       for (const dep of body.depends_on) insertDep({ task_id: id, depends_on: dep });
     }
     tasksTotal.inc();
+    req.log.info({ reqId: req.id, taskId: id, title: body.title, agent: req.agent?.name }, 'task created');
     return reply.send({ ok: true, id });
   });
 

@@ -33,7 +33,7 @@ describe('PR adapter', () => {
         task_id: taskId,
         title: 'Update docs file',
         body: 'Testing local PR artifact',
-        files: [{ path: 'docs/example.md', content: '# Example' }]
+        files: [{ path: 'docs/api/example.md', content: '# Example' }]
       }
     });
     expect(prRes.statusCode).toBe(200);
