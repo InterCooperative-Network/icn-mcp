@@ -26,18 +26,18 @@ describe('policy check', () => {
       method: 'POST',
       url: '/api/policy/check',
       headers: { Authorization: `Bearer ${token}` },
-      payload: { actor: 'planner', changedPaths: ['docs/protocols/x.md'] }
+      payload: { actor: 'planner', changedPaths: ['docs/api/readme.md'] }
     });
     expect(denyRes.statusCode).toBe(200);
     const deny = denyRes.json() as any;
     expect(deny.allow).toBe(false);
 
-    // Allow: architect can modify docs/**
+    // Allow: architect can modify docs/** (using a path that doesn't require special reviews)
     const allowRes = await app.inject({
       method: 'POST',
       url: '/api/policy/check',
       headers: { Authorization: `Bearer ${token}` },
-      payload: { actor: 'architect', changedPaths: ['docs/protocols/x.md'] }
+      payload: { actor: 'architect', changedPaths: ['docs/api/readme.md'] }
     });
     expect(allowRes.statusCode).toBe(200);
     const allow = allowRes.json() as any;
