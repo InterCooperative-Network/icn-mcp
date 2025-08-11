@@ -1,4 +1,5 @@
-import { TfIdf, WordTokenizer, PorterStemmer } from 'natural';
+import pkg from 'natural';
+const { TfIdf, WordTokenizer, PorterStemmer } = pkg;
 
 export interface EmbeddingOptions {
   maxFeatures?: number;
@@ -8,8 +9,8 @@ export interface EmbeddingOptions {
 }
 
 export class Embeddings {
-  private tfidf: TfIdf;
-  private tokenizer: WordTokenizer;
+  private tfidf: any;
+  private tokenizer: any;
   private vocabulary: Map<string, number> = new Map();
   private options: Required<EmbeddingOptions>;
   private documents: string[] = [];
@@ -220,15 +221,15 @@ export class Embeddings {
     let tokens = this.tokenizer.tokenize(processed) || [];
     
     // Apply stemming
-    tokens = tokens.map(token => PorterStemmer.stem(token));
+    tokens = tokens.map((token: string) => PorterStemmer.stem(token));
     
     // Remove stop words if enabled
     if (this.options.useStopWords) {
-      tokens = tokens.filter(token => !this.stopWords.has(token));
+      tokens = tokens.filter((token: string) => !this.stopWords.has(token));
     }
     
     // Filter out very short tokens
-    tokens = tokens.filter(token => token.length > 2);
+    tokens = tokens.filter((token: string) => token.length > 2);
     
     return tokens;
   }
