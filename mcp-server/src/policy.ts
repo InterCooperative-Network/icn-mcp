@@ -104,14 +104,60 @@ function matchGlob(glob: string, filePath: string): boolean {
   return glob === filePath || filePath.startsWith(glob + '/');
 }
 
+function normalizePath(inputPath: string): string | null {
+  try {
+    // Reject paths with directory traversal patterns
+    if (inputPath.includes('..') || 
+        inputPath.includes('%2e%2e') || 
+        inputPath.includes('%2E%2E') ||
+        inputPath.includes('%252e%252e') ||
+        inputPath.includes('\\')) {
+      return null; // Reject directory traversal attempts
+    }
+    
+    // Normalize to forward slashes and remove redundant separators
+    let normalized = inputPath.replace(/[\\//]+/g, '/');
+    
+    // Remove leading slash to ensure relative paths
+    normalized = normalized.replace(/^\/+/, '');
+    
+    // Remove trailing slash (except for empty string)
+    if (normalized.length > 0) {
+      normalized = normalized.replace(/\/+$/, '');
+    }
+    
+    // Use path.normalize but ensure forward slashes
+    normalized = path.normalize(normalized).replace(/\\/g, '/');
+    
+    // Final check - if normalization resulted in traversal, reject
+    if (normalized.includes('../') || normalized.startsWith('../') || normalized === '..') {
+      return null;
+    }
+    
+    return normalized;
+  } catch {
+    return null; // Reject on any normalization error
+  }
+}
 export function checkPolicy(input: { actor: string; changedPaths: string[] }): PolicyDecision {
   const rules = cachedRules ?? readRules();
   const reasons: string[] = [];
 
+  // Normalize and validate all paths first
+  const normalizedPaths: string[] = [];
+  for (const inputPath of input.changedPaths) {
+    const normalized = normalizePath(inputPath);
+    if (normalized === null) {
+      reasons.push(`path traversal blocked: ${inputPath}`);
+      continue;
+    }
+    normalizedPaths.push(normalized);
+  }
+
   // path capabilities enforcement
   if (rules.path_caps && Object.prototype.hasOwnProperty.call(rules.path_caps, input.actor)) {
     const caps = rules.path_caps[input.actor] ?? [];
-    for (const p of input.changedPaths) {
+    for (const p of normalizedPaths) {
       const allowed = caps.some((g) => matchGlob(g, p));
       if (!allowed) reasons.push(`path ${p} not allowed for actor ${input.actor}`);
     }
@@ -121,7 +167,7 @@ export function checkPolicy(input: { actor: string; changedPaths: string[] }): P
   if (rules.codeowners_integration) {
     const codeowners = cachedCodeowners ?? parseCodeowners();
     if (codeowners.size > 0) {
-      for (const path of input.changedPaths) {
+      for (const path of normalizedPaths) {
         for (const [pattern, owners] of codeowners.entries()) {
           if (matchGlob(pattern, path)) {
             if (!owners.includes(input.actor) && !owners.includes('*')) {
@@ -137,7 +183,7 @@ export function checkPolicy(input: { actor: string; changedPaths: string[] }): P
   // reviews_required enforcement
   if (rules.reviews_required) {
     for (const rule of rules.reviews_required) {
-      const affectedPaths = input.changedPaths.filter(path =>
+      const affectedPaths = normalizedPaths.filter(path =>
         rule.paths.some(pattern => matchGlob(pattern, path))
       );
       if (affectedPaths.length > 0) {

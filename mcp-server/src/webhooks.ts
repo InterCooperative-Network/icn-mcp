@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
-import { insertWebhookEvent } from './db.js';
-import { analyzePr } from './pr-coach.js';
-import { webhooksInvalidSigTotal, webhooksReceivedTotal } from './metrics.js';
+import { insertWebhookEvent } from '@/db';
+import { analyzePr } from '@/pr-coach';
+import { webhooksInvalidSigTotal, webhooksReceivedTotal } from '@/metrics';
 
 function safeStringify(body: unknown): string {
   if (typeof body === 'string') return body;
@@ -25,10 +25,10 @@ function extractTaskId(payload: any): string | undefined {
 
   for (const body of possibleBodies) {
     if (typeof body === 'string') {
-      // Look for patterns like "Task-ID: task_abc123" or "Task-ID:task_abc123"
-      const match = body.match(/Task-ID:\s*([a-zA-Z0-9_-]+)/i);
+      // Use safer regex: /(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/
+      const match = body.match(/(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/);
       if (match) {
-        return match[1];
+        return match[2]; // Return the second capture group (the actual task ID)
       }
     }
   }

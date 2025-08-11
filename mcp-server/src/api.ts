@@ -7,11 +7,22 @@ import { requireAuth } from '@/auth';
 import { tasksTotal, policyDeniesTotal, prCreatesTotal, agentsTotal } from './metrics.js';
 import crypto from 'node:crypto';
 import { webhooksRoute } from './webhooks.js';
-import { buildTaskBrief } from './context.js';
+import { buildTaskBrief } from '@/context';
+import { GITHUB_OWNER, GITHUB_REPO, GITHUB_DEFAULT_BRANCH } from '@/config';
 import { workersRoute } from './workers.js';
 
 export async function healthRoute(f: FastifyInstance) {
   f.get('/healthz', async () => ({ ok: true }));
+  
+  f.get('/healthz/context', async () => ({
+    ok: true,
+    config: {
+      github_owner: GITHUB_OWNER,
+      github_repo: GITHUB_REPO,
+      github_default_branch: GITHUB_DEFAULT_BRANCH,
+      environment: process.env.NODE_ENV || 'development'
+    }
+  }));
 }
 
 const AgentRegister = z.object({
