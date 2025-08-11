@@ -23,3 +23,8 @@ export const DB_PATH = path.join(DB_DIR, "icn-mcp.sqlite");
 
 export const MIGRATIONS_DIR =
   process.env.MCP_MIGRATIONS_DIR ?? path.join(REPO_ROOT, "db", "migrations");
+
+// GitHub repository configuration
+export const GITHUB_OWNER = process.env.GITHUB_OWNER ?? 'InterCooperative-Network';
+export const GITHUB_REPO = process.env.GITHUB_REPO ?? 'icn-mcp';
+export const GITHUB_DEFAULT_BRANCH = process.env.GITHUB_DEFAULT_BRANCH ?? 'main';

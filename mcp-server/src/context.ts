@@ -1,5 +1,6 @@
 import { getTaskById, getTaskDeps } from './db.js';
 import { checkPolicy } from './policy.js';
+import { GITHUB_OWNER, GITHUB_REPO } from './config.js';
 
 export interface TaskBrief {
   task: { id: string; title: string; acceptance: string[] };
@@ -15,8 +16,8 @@ export function buildTaskBrief(taskId: string): TaskBrief {
   if (!task) throw new Error('task_not_found');
   const deps = getTaskDeps(taskId);
 
-  const owner = process.env.GITHUB_OWNER || 'InterCooperative-Network';
-  const repo = process.env.GITHUB_REPO || 'icn-mcp';
+  const owner = GITHUB_OWNER;
+  const repo = GITHUB_REPO;
 
   const acceptance: string[] = [];
   if (task.description) acceptance.push(`Implements: ${task.description}`);

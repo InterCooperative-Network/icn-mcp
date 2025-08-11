@@ -12,7 +12,7 @@ export type InsertRunInput = { task_id: string; agent: string; status: string; n
 export type InsertArtifactInput = { task_id: string; kind: string; path: string; meta?: unknown };
 export type AgentRow = { id: string; name: string; kind: string; token: string; created_at: string; expires_at?: string };
 export type InsertWebhookEventInput = {
-  event: string; delivery?: string; action?: string; repo?: string; sender?: string; payload?: unknown
+  event: string; delivery?: string; action?: string; repo?: string; sender?: string; payload?: unknown; task_id?: string;
 };
 
 let dbInstance: Database.Database | null = null;
@@ -244,7 +244,7 @@ export function insertWebhookEvent(input: InsertWebhookEventInput): { id: string
   const db = getDb();
   const id = generateId('wh');
   const stmt = db.prepare(
-    'INSERT INTO webhook_events (id, event, delivery, action, repo, sender, payload) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO webhook_events (id, event, delivery, action, repo, sender, payload, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   stmt.run(
     id,
@@ -253,7 +253,8 @@ export function insertWebhookEvent(input: InsertWebhookEventInput): { id: string
     input.action ?? null,
     input.repo ?? null,
     input.sender ?? null,
-    input.payload ? JSON.stringify(input.payload) : null
+    input.payload ? JSON.stringify(input.payload) : null,
+    input.task_id ?? null
   );
   return { id };
 }

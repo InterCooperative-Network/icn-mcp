@@ -4,7 +4,7 @@ import { getNextOpenTask, markTaskClaimed, getTaskStatus } from './workers_db.js
 import { insertRun } from './db.js';
 import { requireAuth } from './auth.js';
 import { checkPolicy } from './policy.js';
-import { policyDeniesTotal } from './metrics.js';
+import { policyDeniesTotal, claimsTotal, runsTotal } from './metrics.js';
 
 function getAgentPaths(agentKind: string, taskId: string): string[] {
   switch (agentKind) {
@@ -44,6 +44,7 @@ export async function workersRoute(f: FastifyInstance) {
     }
     
     markTaskClaimed(task.id, req.agent.id);
+    claimsTotal.inc();
     req.log.info({ taskId: task.id, agent: req.agent.name, agentKind: req.agent.kind }, 'task claimed');
     return reply.send({ task_id: task.id, title: task.title });
   });
@@ -71,6 +72,7 @@ export async function workersRoute(f: FastifyInstance) {
     }
     
     insertRun({ task_id: body.task_id, agent: req.agent.id, status: body.status, notes: body.notes });
+    runsTotal.inc({ status: body.status });
     req.log.info({ taskId: body.task_id, status: body.status, agent: req.agent.name }, 'task run updated');
     return reply.send({ ok: true });
   });

@@ -14,6 +14,28 @@ function safeStringify(body: unknown): string {
   }
 }
 
+function extractTaskId(payload: any): string | undefined {
+  // Extract Task-ID marker from issue/PR bodies
+  const possibleBodies = [
+    payload?.issue?.body,
+    payload?.pull_request?.body,
+    payload?.comment?.body,
+    payload?.issue_comment?.body
+  ].filter(Boolean);
+
+  for (const body of possibleBodies) {
+    if (typeof body === 'string') {
+      // Look for patterns like "Task-ID: task_abc123" or "Task-ID:task_abc123"
+      const match = body.match(/Task-ID:\s*([a-zA-Z0-9_-]+)/i);
+      if (match) {
+        return match[1];
+      }
+    }
+  }
+  
+  return undefined;
+}
+
 function verifyHmac256(payload: string | Buffer, signatureHeader: string | undefined, secret: string): boolean {
   if (!signatureHeader || !signatureHeader.startsWith('sha256=')) return false;
   const theirSig = signatureHeader.slice('sha256='.length);
@@ -54,6 +76,7 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
   const action: string | undefined = payload?.action;
   const repoFullName: string | undefined = payload?.repository?.full_name;
   const senderLogin: string | undefined = payload?.sender?.login;
+  const taskId = extractTaskId(payload);
 
   // Record event
   try {
@@ -63,9 +86,14 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
       action: action ?? '',
       repo: repoFullName ?? '',
       sender: senderLogin ?? '',
-      payload
+      payload,
+      task_id: taskId
     });
     webhooksReceivedTotal.inc({ event: event ?? 'unknown' });
+    
+    if (taskId) {
+      req.log.info({ taskId, reqId: req.id, event, action }, 'webhook linked to task');
+    }
   } catch (err) {
     req.log.error({ err, reqId: req.id }, 'failed to log webhook event');
   }

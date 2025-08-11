@@ -3,6 +3,7 @@ import path from 'node:path';
 import { insertArtifact } from './db.js';
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
+import { GITHUB_OWNER, GITHUB_REPO, GITHUB_DEFAULT_BRANCH } from './config.js';
 
 export type LocalPrFile = { path: string; content: string };
 
@@ -42,9 +43,9 @@ export async function createPr(input: {
   files: LocalPrFile[];
 }): Promise<{ mode: 'github'; url: string } | { mode: 'local'; artifact: string }> {
   const token = process.env.GITHUB_TOKEN;
-  const owner = process.env.GITHUB_OWNER || 'InterCooperative-Network';
-  const repo = process.env.GITHUB_REPO || 'icn-mcp';
-  const base = process.env.GITHUB_BASE || process.env.GITHUB_DEFAULT_BRANCH || 'main';
+  const owner = GITHUB_OWNER;
+  const repo = GITHUB_REPO;
+  const base = process.env.GITHUB_BASE || GITHUB_DEFAULT_BRANCH;
 
   if (token && owner && repo) {
     const octokit = new Octokit({ auth: token });

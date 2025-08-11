@@ -36,6 +36,17 @@ export const webhooksReceivedTotal = new client.Counter({
   labelNames: ['event'] as const
 });
 
+export const claimsTotal = new client.Counter({
+  name: 'icn_mcp_claims_total',
+  help: 'Number of tasks claimed by agents'
+});
+
+export const runsTotal = new client.Counter({
+  name: 'icn_mcp_runs_total',
+  help: 'Number of task runs reported by agents',
+  labelNames: ['status'] as const
+});
+
 const dashboardHTML = `
 <!DOCTYPE html>
 <html>
@@ -115,6 +126,8 @@ const dashboardHTML = `
             const metricDefinitions = [
                 { key: 'icn_mcp_tasks_total', title: 'Total Tasks', description: 'Total number of tasks created' },
                 { key: 'icn_mcp_agents_total', title: 'Active Agents', description: 'Number of registered agents' },
+                { key: 'icn_mcp_claims_total', title: 'Task Claims', description: 'Number of tasks claimed by agents' },
+                { key: 'icn_mcp_runs_total', title: 'Task Runs', description: 'Number of task runs reported by agents' },
                 { key: 'icn_mcp_policy_denies_total', title: 'Policy Denies', description: 'Number of policy denials' },
                 { key: 'icn_mcp_pr_creates_total', title: 'PR Creates', description: 'Number of PRs created' },
                 { key: 'icn_mcp_webhooks_received_total', title: 'Webhooks Received', description: 'GitHub webhook events received' },
