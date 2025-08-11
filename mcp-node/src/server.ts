@@ -14,6 +14,13 @@ import { icnCheckPolicy } from './tools/icn_check_policy.js';
 import { icnGetTaskContext } from './tools/icn_get_task_context.js';
 import { icnGetSimilarPrs } from './tools/icn_get_similar_prs.js';
 import { icnSuggestApproach } from './tools/icn_suggest_approach.js';
+import { 
+  icnStartWorkflow, 
+  icnGetNextStep, 
+  icnCheckpoint, 
+  icnListWorkflowTemplates,
+  icnGetWorkflowState
+} from './tools/icn_workflow.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -155,6 +162,100 @@ class ICNMCPServer {
               files_to_modify,
               constraints,
               context
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_start_workflow': {
+            if (!args?.templateId || typeof args.templateId !== 'string') {
+              throw new Error('templateId parameter is required and must be a string');
+            }
+            const initialData = typeof args.initialData === 'object' && args.initialData !== null ? args.initialData : {};
+            const result = await executeWithTimeout(() => icnStartWorkflow({
+              templateId: args.templateId as string,
+              initialData
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_get_next_step': {
+            if (!args?.workflowId || typeof args.workflowId !== 'string') {
+              throw new Error('workflowId parameter is required and must be a string');
+            }
+            const result = await executeWithTimeout(() => icnGetNextStep({
+              workflowId: args.workflowId as string
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_checkpoint': {
+            if (!args?.workflowId || typeof args.workflowId !== 'string') {
+              throw new Error('workflowId parameter is required and must be a string');
+            }
+            if (!args?.stepId || typeof args.stepId !== 'string') {
+              throw new Error('stepId parameter is required and must be a string');
+            }
+            if (!args?.data || typeof args.data !== 'object') {
+              throw new Error('data parameter is required and must be an object');
+            }
+            const notes = typeof args.notes === 'string' ? args.notes : undefined;
+            const completeStep = typeof args.completeStep === 'boolean' ? args.completeStep : false;
+            const result = await executeWithTimeout(() => icnCheckpoint({
+              workflowId: args.workflowId as string,
+              stepId: args.stepId as string,
+              data: args.data as Record<string, any>,
+              notes,
+              completeStep
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_list_workflow_templates': {
+            const result = await executeWithTimeout(() => icnListWorkflowTemplates());
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_get_workflow_state': {
+            if (!args?.workflowId || typeof args.workflowId !== 'string') {
+              throw new Error('workflowId parameter is required and must be a string');
+            }
+            const result = await executeWithTimeout(() => icnGetWorkflowState({
+              workflowId: args.workflowId as string
             }));
             return {
               content: [

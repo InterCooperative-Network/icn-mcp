@@ -1,0 +1,162 @@
+{
+  "id": "complex-feature-development",
+  "version": "1.0.0",
+  "name": "Complex Feature Development Workflow",
+  "description": "Multi-step workflow for developing complex features across multiple components",
+  "category": "development",
+  "tags": ["feature", "development", "planning", "implementation"],
+  "steps": [
+    {
+      "id": "requirements-analysis",
+      "title": "Requirements Analysis",
+      "description": "Gather and analyze feature requirements",
+      "actions": [
+        "Define user stories and acceptance criteria",
+        "Identify stakeholders and their needs",
+        "Document functional and non-functional requirements",
+        "Create mockups or wireframes if needed",
+        "Estimate complexity and timeline"
+      ],
+      "validation": {
+        "requiredFlags": [
+          "requirements_documented",
+          "acceptance_criteria_defined"
+        ]
+      },
+      "dependsOn": []
+    },
+    {
+      "id": "architecture-design",
+      "title": "Architecture Design",
+      "description": "Design the technical architecture for the feature",
+      "actions": [
+        "Design system architecture and components",
+        "Plan database schema changes",
+        "Define API contracts and interfaces",
+        "Consider scalability and performance",
+        "Review security implications"
+      ],
+      "dependsOn": ["requirements-analysis"],
+      "validation": {
+        "requiredFlags": [
+          "architecture_designed",
+          "interfaces_defined"
+        ]
+      }
+    },
+    {
+      "id": "technical-planning",
+      "title": "Technical Planning",
+      "description": "Break down work into manageable tasks",
+      "actions": [
+        "Create detailed task breakdown",
+        "Identify dependencies between tasks",
+        "Assign effort estimates to tasks",
+        "Plan implementation phases",
+        "Set up development environment"
+      ],
+      "dependsOn": ["architecture-design"],
+      "validation": {
+        "requiredFlags": [
+          "tasks_defined",
+          "timeline_planned"
+        ]
+      }
+    },
+    {
+      "id": "backend-implementation",
+      "title": "Backend Implementation",
+      "description": "Implement backend components and APIs",
+      "actions": [
+        "Implement database migrations",
+        "Create API endpoints",
+        "Add business logic",
+        "Implement error handling",
+        "Add logging and monitoring"
+      ],
+      "dependsOn": ["technical-planning"],
+      "validation": {
+        "requiredFlags": [
+          "backend_implemented",
+          "apis_created"
+        ]
+      }
+    },
+    {
+      "id": "frontend-implementation",
+      "title": "Frontend Implementation",
+      "description": "Implement user interface components",
+      "actions": [
+        "Create UI components",
+        "Implement user interactions",
+        "Add form validation",
+        "Connect to backend APIs",
+        "Ensure responsive design"
+      ],
+      "dependsOn": ["backend-implementation"],
+      "validation": {
+        "requiredFlags": [
+          "frontend_implemented",
+          "ui_complete"
+        ]
+      }
+    },
+    {
+      "id": "integration-testing",
+      "title": "Integration Testing",
+      "description": "Test the complete feature end-to-end",
+      "actions": [
+        "Test all user workflows",
+        "Verify API integrations",
+        "Test error scenarios",
+        "Performance testing",
+        "Cross-browser/device testing"
+      ],
+      "dependsOn": ["frontend-implementation"],
+      "validation": {
+        "requiredFlags": [
+          "integration_tested",
+          "performance_verified"
+        ]
+      }
+    },
+    {
+      "id": "documentation",
+      "title": "Documentation",
+      "description": "Create comprehensive documentation",
+      "actions": [
+        "Write user documentation",
+        "Create API documentation",
+        "Document configuration options",
+        "Add troubleshooting guides",
+        "Update system documentation"
+      ],
+      "dependsOn": ["integration-testing"],
+      "validation": {
+        "requiredFlags": [
+          "documentation_complete",
+          "guides_created"
+        ]
+      }
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment and Launch",
+      "description": "Deploy the feature to production",
+      "actions": [
+        "Deploy to staging environment",
+        "Conduct user acceptance testing",
+        "Deploy to production",
+        "Monitor system health",
+        "Gather user feedback"
+      ],
+      "dependsOn": ["documentation"],
+      "validation": {
+        "requiredFlags": [
+          "feature_deployed",
+          "monitoring_active"
+        ]
+      }
+    }
+  ]
+}

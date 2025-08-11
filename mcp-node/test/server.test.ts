@@ -7,7 +7,7 @@ describe('MCP Server', () => {
       const manifest = generateToolManifest();
       
       expect(Array.isArray(manifest)).toBe(true);
-      expect(manifest.length).toBe(6);
+      expect(manifest.length).toBe(11);
       
       const toolNames = manifest.map(tool => tool.name);
       expect(toolNames).toContain('icn_get_architecture');
@@ -16,6 +16,11 @@ describe('MCP Server', () => {
       expect(toolNames).toContain('icn_get_task_context');
       expect(toolNames).toContain('icn_get_similar_prs');
       expect(toolNames).toContain('icn_suggest_approach');
+      expect(toolNames).toContain('icn_start_workflow');
+      expect(toolNames).toContain('icn_get_next_step');
+      expect(toolNames).toContain('icn_checkpoint');
+      expect(toolNames).toContain('icn_list_workflow_templates');
+      expect(toolNames).toContain('icn_get_workflow_state');
       
       // Check tool structure
       for (const tool of manifest) {
@@ -42,6 +47,21 @@ describe('MCP Server', () => {
       
       const suggestApproachTool = manifest.find(tool => tool.name === 'icn_suggest_approach');
       expect(suggestApproachTool?.inputSchema.required).toContain('task_description');
+      
+      // Test workflow tools
+      const startWorkflowTool = manifest.find(tool => tool.name === 'icn_start_workflow');
+      expect(startWorkflowTool?.inputSchema.required).toContain('templateId');
+      
+      const getNextStepTool = manifest.find(tool => tool.name === 'icn_get_next_step');
+      expect(getNextStepTool?.inputSchema.required).toContain('workflowId');
+      
+      const checkpointTool = manifest.find(tool => tool.name === 'icn_checkpoint');
+      expect(checkpointTool?.inputSchema.required).toContain('workflowId');
+      expect(checkpointTool?.inputSchema.required).toContain('stepId');
+      expect(checkpointTool?.inputSchema.required).toContain('data');
+      
+      const getWorkflowStateTool = manifest.find(tool => tool.name === 'icn_get_workflow_state');
+      expect(getWorkflowStateTool?.inputSchema.required).toContain('workflowId');
     });
   });
 

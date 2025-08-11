@@ -69,6 +69,55 @@ export const runsTotal = getOrCreateCounter(
   ['status', 'agent_kind', 'task_kind']
 );
 
+// Workflow metrics
+export const workflowsStartedTotal = getOrCreateCounter(
+  'icn_mcp_workflows_started_total',
+  'Total number of workflows started',
+  ['template_id']
+);
+
+export const workflowsCompletedTotal = getOrCreateCounter(
+  'icn_mcp_workflows_completed_total',
+  'Total number of workflows completed',
+  ['template_id', 'status']
+);
+
+export const workflowStepsTotal = getOrCreateCounter(
+  'icn_mcp_workflow_steps_total',
+  'Total number of workflow steps completed',
+  ['template_id', 'step_id']
+);
+
+export const workflowCheckpointsTotal = getOrCreateCounter(
+  'icn_mcp_workflow_checkpoints_total',
+  'Total number of workflow checkpoints created',
+  ['template_id']
+);
+
+export const workflowActiveGauge = getOrCreateGauge(
+  'icn_mcp_workflows_active',
+  'Number of currently active workflows',
+  ['template_id']
+);
+
+function getOrCreateHistogram(name: string, help: string, buckets?: number[], labelNames?: string[]) {
+  const existing = client.register.getSingleMetric(name);
+  if (existing) return existing as client.Histogram<string>;
+  const config: any = { name, help };
+  if (buckets) config.buckets = buckets;
+  if (labelNames && labelNames.length > 0) {
+    config.labelNames = labelNames;
+  }
+  return new client.Histogram(config);
+}
+
+export const workflowStepDurationHistogram = getOrCreateHistogram(
+  'icn_mcp_workflow_step_duration_seconds',
+  'Duration of workflow step execution',
+  [0.1, 0.5, 1, 5, 10, 30, 60, 300, 900, 1800], // 0.1s to 30min buckets
+  ['template_id', 'step_id']
+);
+
 const dashboardHTML = `
 <!DOCTYPE html>
 <html>

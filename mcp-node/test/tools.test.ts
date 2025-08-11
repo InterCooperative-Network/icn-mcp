@@ -5,6 +5,13 @@ import { icnCheckPolicy } from '../src/tools/icn_check_policy.js';
 import { icnGetTaskContext } from '../src/tools/icn_get_task_context.js';
 import { icnGetSimilarPrs } from '../src/tools/icn_get_similar_prs.js';
 import { icnSuggestApproach } from '../src/tools/icn_suggest_approach.js';
+import { 
+  icnStartWorkflow, 
+  icnGetNextStep, 
+  icnCheckpoint, 
+  icnListWorkflowTemplates,
+  icnGetWorkflowState
+} from '../src/tools/icn_workflow.js';
 
 describe('ICN Tools', () => {
   describe('icnGetArchitecture', () => {
@@ -193,6 +200,133 @@ describe('ICN Tools', () => {
         approach => approach.approach_name.toLowerCase().includes('mcp')
       );
       expect(hasMcpApproach).toBe(true);
+    });
+  });
+
+  describe('Workflow Tools', () => {
+    describe('icnListWorkflowTemplates', () => {
+      it('should return available workflow templates', async () => {
+        const result = await icnListWorkflowTemplates();
+        
+        expect(result).toHaveProperty('templates');
+        expect(result).toHaveProperty('categories');
+        expect(result).toHaveProperty('tags');
+        expect(Array.isArray(result.templates)).toBe(true);
+        expect(Array.isArray(result.categories)).toBe(true);
+        expect(Array.isArray(result.tags)).toBe(true);
+        
+        if (result.templates.length > 0) {
+          const template = result.templates[0];
+          expect(template).toHaveProperty('id');
+          expect(template).toHaveProperty('name');
+          expect(template).toHaveProperty('description');
+          expect(template).toHaveProperty('steps');
+          expect(Array.isArray(template.steps)).toBe(true);
+        }
+      });
+    });
+
+    describe('icnStartWorkflow', () => {
+      it('should start a workflow if template exists', async () => {
+        // First get available templates
+        const templates = await icnListWorkflowTemplates();
+        
+        if (templates.templates.length > 0) {
+          const templateId = templates.templates[0].id;
+          const result = await icnStartWorkflow({ 
+            templateId,
+            initialData: { testData: 'test value' }
+          });
+          
+          expect(result).toHaveProperty('workflowId');
+          expect(result).toHaveProperty('template');
+          expect(result).toHaveProperty('nextStep');
+          expect(result).toHaveProperty('state');
+          expect(typeof result.workflowId).toBe('string');
+          expect(result.template.id).toBe(templateId);
+          expect(result.state.status).toBe('active');
+        }
+      });
+
+      it('should throw error for non-existent template', async () => {
+        await expect(icnStartWorkflow({ templateId: 'non-existent-template' }))
+          .rejects.toThrow(/not found/);
+      });
+    });
+
+    describe('icnGetNextStep and icnCheckpoint', () => {
+      it('should handle workflow progression', async () => {
+        // First get available templates
+        const templates = await icnListWorkflowTemplates();
+        
+        if (templates.templates.length > 0) {
+          const templateId = templates.templates[0].id;
+          
+          // Start workflow
+          const startResult = await icnStartWorkflow({ templateId });
+          const workflowId = startResult.workflowId;
+          
+          // Get next step
+          const nextStepResult = await icnGetNextStep({ workflowId });
+          expect(nextStepResult).toHaveProperty('nextStep');
+          expect(nextStepResult).toHaveProperty('state');
+          expect(nextStepResult).toHaveProperty('availableActions');
+          expect(Array.isArray(nextStepResult.availableActions)).toBe(true);
+          
+          if (nextStepResult.nextStep.step) {
+            const stepId = nextStepResult.nextStep.step.id;
+            
+            // Create checkpoint
+            const checkpointResult = await icnCheckpoint({
+              workflowId,
+              stepId,
+              data: { progress: 'checkpoint created' },
+              notes: 'Test checkpoint'
+            });
+            
+            expect(checkpointResult).toHaveProperty('checkpoint');
+            expect(checkpointResult).toHaveProperty('nextStep');
+            expect(checkpointResult).toHaveProperty('state');
+            expect(checkpointResult.checkpoint.stepId).toBe(stepId);
+            expect(checkpointResult.checkpoint.notes).toBe('Test checkpoint');
+          }
+        }
+      });
+
+      it('should throw error for non-existent workflow', async () => {
+        await expect(icnGetNextStep({ workflowId: 'non-existent-workflow' }))
+          .rejects.toThrow(/not found/);
+      });
+    });
+
+    describe('icnGetWorkflowState', () => {
+      it('should return workflow state', async () => {
+        // First get available templates
+        const templates = await icnListWorkflowTemplates();
+        
+        if (templates.templates.length > 0) {
+          const templateId = templates.templates[0].id;
+          
+          // Start workflow
+          const startResult = await icnStartWorkflow({ templateId });
+          const workflowId = startResult.workflowId;
+          
+          // Get state
+          const state = await icnGetWorkflowState({ workflowId });
+          expect(state).toHaveProperty('workflowId');
+          expect(state).toHaveProperty('templateId');
+          expect(state).toHaveProperty('status');
+          expect(state).toHaveProperty('completedSteps');
+          expect(state).toHaveProperty('checkpoints');
+          expect(state.workflowId).toBe(workflowId);
+          expect(state.templateId).toBe(templateId);
+        }
+      });
+
+      it('should throw error for non-existent workflow', async () => {
+        await expect(icnGetWorkflowState({ workflowId: 'non-existent-workflow' }))
+          .rejects.toThrow(/not found/);
+      });
     });
   });
 });

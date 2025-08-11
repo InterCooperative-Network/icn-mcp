@@ -1,0 +1,126 @@
+{
+  "id": "debug-workflow",
+  "version": "1.0.0",
+  "name": "Debug Issue Workflow",
+  "description": "Systematic workflow for debugging and fixing issues",
+  "category": "debugging",
+  "tags": ["debug", "troubleshooting", "bug-fix"],
+  "steps": [
+    {
+      "id": "reproduce-issue",
+      "title": "Reproduce the Issue",
+      "description": "Consistently reproduce the bug or issue",
+      "actions": [
+        "Gather information about the issue",
+        "Identify steps to reproduce",
+        "Create minimal reproduction case",
+        "Document expected vs actual behavior",
+        "Verify issue exists in current codebase"
+      ],
+      "validation": {
+        "requiredFlags": [
+          "issue_reproduced",
+          "steps_documented"
+        ]
+      },
+      "dependsOn": []
+    },
+    {
+      "id": "analyze-root-cause",
+      "title": "Analyze Root Cause",
+      "description": "Investigate and identify the underlying cause",
+      "actions": [
+        "Add debugging statements or breakpoints",
+        "Trace code execution path",
+        "Examine logs and error messages",
+        "Review recent changes that might have caused the issue",
+        "Identify the specific component or function causing the problem"
+      ],
+      "dependsOn": ["reproduce-issue"],
+      "validation": {
+        "requiredFlags": [
+          "root_cause_identified",
+          "investigation_complete"
+        ]
+      }
+    },
+    {
+      "id": "design-fix",
+      "title": "Design the Fix",
+      "description": "Plan the solution approach",
+      "actions": [
+        "Consider multiple solution approaches",
+        "Evaluate impact of each approach",
+        "Choose the safest and most maintainable solution",
+        "Plan implementation steps",
+        "Consider edge cases and potential side effects"
+      ],
+      "dependsOn": ["analyze-root-cause"],
+      "validation": {
+        "requiredFlags": [
+          "solution_designed",
+          "approach_validated"
+        ]
+      }
+    },
+    {
+      "id": "implement-fix",
+      "title": "Implement the Fix",
+      "description": "Code and implement the solution",
+      "actions": [
+        "Make minimal changes to fix the issue",
+        "Follow coding standards and conventions",
+        "Add appropriate error handling",
+        "Update related documentation if needed",
+        "Ensure fix doesn't break existing functionality"
+      ],
+      "dependsOn": ["design-fix"],
+      "validation": {
+        "requiredFlags": [
+          "fix_implemented",
+          "code_reviewed"
+        ]
+      }
+    },
+    {
+      "id": "test-fix",
+      "title": "Test the Fix",
+      "description": "Verify the fix resolves the issue",
+      "actions": [
+        "Test the original reproduction case",
+        "Run existing test suite",
+        "Add new tests for the bug scenario",
+        "Test edge cases and related functionality",
+        "Perform regression testing"
+      ],
+      "dependsOn": ["implement-fix"],
+      "validation": {
+        "requiredFlags": [
+          "fix_tested",
+          "regression_tested",
+          "tests_added"
+        ]
+      }
+    },
+    {
+      "id": "deploy-and-monitor",
+      "title": "Deploy and Monitor",
+      "description": "Deploy the fix and monitor for issues",
+      "actions": [
+        "Deploy fix to staging environment",
+        "Monitor for any new issues",
+        "Deploy to production if staging is successful",
+        "Monitor production for the fixed issue",
+        "Document lessons learned"
+      ],
+      "dependsOn": ["test-fix"],
+      "validation": {
+        "requiredFlags": [
+          "fix_deployed",
+          "monitoring_confirmed",
+          "issue_resolved"
+        ]
+      }
+    }
+  ]
+}

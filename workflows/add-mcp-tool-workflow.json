@@ -1,0 +1,163 @@
+{
+  "id": "add-mcp-tool-workflow",
+  "version": "1.0.0",
+  "name": "Add MCP Tool Workflow",
+  "description": "Complete workflow for adding a new MCP tool to the ICN system",
+  "category": "development",
+  "tags": ["mcp", "tools", "typescript", "development"],
+  "steps": [
+    {
+      "id": "design-interface",
+      "title": "Design Tool Interface",
+      "description": "Define TypeScript interfaces for the new tool",
+      "actions": [
+        "Create request interface with required parameters",
+        "Create response interface with structured data",
+        "Consider optional parameters and error cases",
+        "Add JSDoc comments for API documentation",
+        "Validate interface follows existing patterns"
+      ],
+      "validation": {
+        "requiredFlags": [
+          "interface_designed",
+          "schema_created"
+        ]
+      },
+      "dependsOn": []
+    },
+    {
+      "id": "implement-tool",
+      "title": "Implement Tool Logic",
+      "description": "Create the tool implementation file",
+      "actions": [
+        "Create new file in mcp-node/src/tools/",
+        "Implement main function with proper error handling",
+        "Add input validation",
+        "Implement core business logic",
+        "Add logging and debugging support"
+      ],
+      "dependsOn": ["design-interface"],
+      "validation": {
+        "requiredFlags": [
+          "tool_implemented",
+          "error_handling_added",
+          "validation_added"
+        ]
+      }
+    },
+    {
+      "id": "update-manifest",
+      "title": "Update Tool Manifest",
+      "description": "Register the new tool in the manifest",
+      "actions": [
+        "Add tool definition to manifest.ts",
+        "Define input schema with proper validation",
+        "Add description and documentation",
+        "Test schema validation"
+      ],
+      "dependsOn": ["implement-tool"],
+      "validation": {
+        "requiredFlags": [
+          "manifest_updated",
+          "schema_defined"
+        ]
+      }
+    },
+    {
+      "id": "write-tests",
+      "title": "Write Unit Tests",
+      "description": "Create comprehensive tests for the new tool",
+      "actions": [
+        "Create test file following naming convention",
+        "Write tests for happy path scenarios",
+        "Write tests for error cases",
+        "Test edge cases and validation",
+        "Ensure good test coverage"
+      ],
+      "dependsOn": ["implement-tool"],
+      "validation": {
+        "requiredFlags": [
+          "tests_written",
+          "coverage_adequate"
+        ]
+      }
+    },
+    {
+      "id": "integration-test",
+      "title": "Integration Testing",
+      "description": "Test the tool in the MCP server context",
+      "actions": [
+        "Start MCP server with new tool",
+        "Test tool via MCP protocol",
+        "Verify error handling works",
+        "Check tool appears in manifest",
+        "Test with real parameters"
+      ],
+      "dependsOn": ["update-manifest", "write-tests"],
+      "validation": {
+        "requiredFlags": [
+          "integration_tested",
+          "mcp_protocol_verified"
+        ]
+      }
+    },
+    {
+      "id": "add-documentation",
+      "title": "Add Documentation",
+      "description": "Document the new tool for users",
+      "actions": [
+        "Add tool to API documentation",
+        "Create usage examples",
+        "Document parameters and responses",
+        "Add troubleshooting guide",
+        "Update any relevant guides"
+      ],
+      "dependsOn": ["integration-test"],
+      "validation": {
+        "requiredFlags": [
+          "documentation_added",
+          "examples_created"
+        ]
+      }
+    },
+    {
+      "id": "code-review",
+      "title": "Code Review and Quality Check",
+      "description": "Ensure code quality and get peer review",
+      "actions": [
+        "Run linting and fix any issues",
+        "Run build and ensure no TypeScript errors",
+        "Submit PR for code review",
+        "Address review feedback",
+        "Ensure CI passes"
+      ],
+      "dependsOn": ["add-documentation"],
+      "validation": {
+        "requiredFlags": [
+          "linting_passed",
+          "build_successful",
+          "review_completed"
+        ]
+      }
+    },
+    {
+      "id": "deploy-tool",
+      "title": "Deploy and Monitor",
+      "description": "Deploy the tool and monitor its usage",
+      "actions": [
+        "Merge approved PR",
+        "Monitor tool usage metrics",
+        "Check for any runtime errors",
+        "Gather user feedback",
+        "Plan any improvements"
+      ],
+      "dependsOn": ["code-review"],
+      "validation": {
+        "requiredFlags": [
+          "deployed_successfully",
+          "monitoring_setup"
+        ]
+      }
+    }
+  ]
+}
