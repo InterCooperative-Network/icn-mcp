@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { countAgents, getAgentByToken } from './db.js';
+import { countAgents, getAgentByToken } from '@/db';
 
 export type AuthenticatedAgent = {
   id: string;

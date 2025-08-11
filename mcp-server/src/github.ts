@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { insertArtifact } from './db.js';
+import { insertArtifact } from '@/db';
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import { GITHUB_OWNER, GITHUB_REPO, GITHUB_DEFAULT_BRANCH } from '@/config';

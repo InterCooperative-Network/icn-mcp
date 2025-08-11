@@ -1,5 +1,5 @@
-import { getTaskById, getTaskDeps } from './db.js';
-import { checkPolicy } from './policy.js';
+import { getTaskById, getTaskDeps } from '@/db';
+import { checkPolicy } from '@/policy';
 import { GITHUB_OWNER, GITHUB_REPO } from '@/config';
 
 export interface TaskBrief {

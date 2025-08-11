@@ -1,9 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { insertTask, listTasks, insertDep, insertAgent, countAgents, refreshAgentToken, cleanupExpiredTokens } from './db.js';
+import { insertTask, listTasks, insertDep, insertAgent, countAgents, refreshAgentToken, cleanupExpiredTokens } from '@/db';
 import { checkPolicy, initPolicyWatcher } from './policy.js';
 import { createPr } from './github.js';
-import { requireAuth } from './auth.js';
+import { requireAuth } from '@/auth';
 import { tasksTotal, policyDeniesTotal, prCreatesTotal, agentsTotal } from './metrics.js';
 import crypto from 'node:crypto';
 import { webhooksRoute } from './webhooks.js';
