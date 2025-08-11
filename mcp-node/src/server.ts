@@ -24,6 +24,10 @@ import {
 import { icnExtractPrinciples } from './tools/icn_extract_principles.js';
 import { icnBuildContext } from './tools/icn_build_context.js';
 import { icnLearnFromFeedback } from './tools/icn_learn_from_feedback.js';
+import { icnSynthesizeSpec } from './tools/icn_synthesize_spec.js';
+import { icnCheckInvariants } from './tools/icn_check_invariants.js';
+import { icnValidateImplementation } from './tools/icn_validate_implementation.js';
+import { icnGenerateTests } from './tools/icn_generate_tests.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -337,6 +341,93 @@ class ICNMCPServer {
               context: args.context as any,
               feedback: args.feedback as any,
               metadata
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_synthesize_spec': {
+            if (!args?.surface || typeof args.surface !== 'string') {
+              throw new Error('surface parameter is required and must be a string');
+            }
+            const result = await executeWithTimeout(() => icnSynthesizeSpec({
+              surface: args.surface as string
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_check_invariants': {
+            const code = typeof args?.code === 'string' ? args.code : undefined;
+            const design = typeof args?.design === 'string' ? args.design : undefined;
+            const description = typeof args?.description === 'string' ? args.description : undefined;
+            
+            if (!code && !design && !description) {
+              throw new Error('At least one of code, design, or description must be provided');
+            }
+            
+            const result = await executeWithTimeout(() => icnCheckInvariants({
+              code,
+              design,
+              description
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_validate_implementation': {
+            if (!args?.code || typeof args.code !== 'string') {
+              throw new Error('code parameter is required and must be a string');
+            }
+            const surface = typeof args.surface === 'string' ? args.surface : undefined;
+            const description = typeof args.description === 'string' ? args.description : undefined;
+            
+            const result = await executeWithTimeout(() => icnValidateImplementation({
+              code: args.code as string,
+              surface,
+              description
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_generate_tests': {
+            if (!args?.component || typeof args.component !== 'string') {
+              throw new Error('component parameter is required and must be a string');
+            }
+            const surface = typeof args.surface === 'string' ? args.surface : undefined;
+            const requirements = Array.isArray(args.requirements) ? args.requirements : undefined;
+            const description = typeof args.description === 'string' ? args.description : undefined;
+            
+            const result = await executeWithTimeout(() => icnGenerateTests({
+              component: args.component as string,
+              surface,
+              requirements,
+              description
             }));
             return {
               content: [
