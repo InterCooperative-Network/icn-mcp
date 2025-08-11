@@ -135,14 +135,14 @@ function analyzeAPIContract(code: string): ValidationIssue[] {
       });
     }
     
-    // Check for proper return types
-    if (/function\s+\w+.*\)(?:\s*:\s*\w+)?\s*\{/.test(line) && !line.includes('Promise') && hasAsyncFunctions) {
+    // Check for proper return types on async functions
+    if (/async\s+function\s+\w+.*\)(?:\s*:\s*\w+)?\s*\{/.test(line) && !line.includes('Promise')) {
       issues.push({
-        severity: 'info',
+        severity: 'warning',
         category: 'api',
-        message: 'Function missing explicit return type annotation',
+        message: 'Async function missing Promise return type annotation',
         location: `Line ${i + 1}`,
-        suggestion: 'Add explicit return type annotations for better type safety'
+        suggestion: 'Add Promise<T> return type annotation for async functions'
       });
     }
   }
