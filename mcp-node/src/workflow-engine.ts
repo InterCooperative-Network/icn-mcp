@@ -180,7 +180,7 @@ export class WorkflowEngine {
     templateId: string, 
     initialData: Record<string, any> = {},
     createdBy?: string,
-    sourceRequestId?: string
+    _sourceRequestId?: string
   ): Promise<string> {
     await this.loadTemplates(); // Ensure templates are loaded
 
@@ -349,7 +349,7 @@ export class WorkflowEngine {
     workflowId: string, 
     stepId: string, 
     outputs?: Record<string, any>,
-    sourceRequestId?: string
+    _sourceRequestId?: string
   ): Promise<void> {
     return this.withWorkflowLock(workflowId, async () => {
       const workflow = this.getWorkflowState(workflowId);

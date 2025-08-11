@@ -2,14 +2,13 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from './auth.js';
 import { checkPolicy } from './policy.js';
-import { getDb } from './db.js';
 import { 
   workflowsStartedTotal, 
-  workflowsCompletedTotal, 
+  // workflowsCompletedTotal, 
   workflowStepsTotal, 
   workflowCheckpointsTotal,
   workflowActiveGauge,
-  workflowStepDurationHistogram
+  // workflowStepDurationHistogram
 } from './metrics.js';
 
 // We'll need to initialize the workflow system differently since we can't import across workspaces
