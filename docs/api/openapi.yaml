@@ -11,10 +11,59 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: http://localhost:8787
-    description: Development server
   - url: https://mcp.icn.network
     description: Production server
+  - url: http://localhost:8787
+    description: Development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: hex
+      description: Agent bearer token for API access
+    HmacSig256:
+      type: apiKey
+      in: header
+      name: X-Hub-Signature-256
+      description: GitHub webhook HMAC-SHA256 signature
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: unauthorized
+            required:
+              - ok
+              - error
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: error_description
+      required:
+        - ok
+        - error
+
+security:
+  - BearerAuth: []
+  - HmacSig256: []
 
 paths:
   /healthz:
@@ -22,6 +71,7 @@ paths:
       summary: Health check
       description: Basic health status endpoint
       operationId: healthCheck
+      security: []  # public
       tags:
         - System
       responses:
@@ -37,12 +87,15 @@ paths:
                     example: true
                 required:
                   - ok
+        '503':
+          description: Service unavailable
 
   /healthz/context:
     get:
       summary: Configuration context
       description: Returns effective configuration values for debugging
       operationId: healthContext
+      security: []  # public
       tags:
         - System
       responses:
@@ -79,12 +132,15 @@ paths:
                 required:
                   - ok
                   - config
+        '403':
+          description: Forbidden
 
   /metrics:
     get:
       summary: Prometheus metrics
       description: Prometheus-format metrics for monitoring
       operationId: getMetrics
+      security: []  # public by default; gate via METRICS_AUTH in deployment
       tags:
         - Monitoring
       responses:
@@ -98,12 +154,15 @@ paths:
                   # HELP icn_mcp_tasks_total Total tasks created
                   # TYPE icn_mcp_tasks_total counter
                   icn_mcp_tasks_total 42
+        '403':
+          description: Forbidden
 
   /dashboard:
     get:
       summary: Metrics dashboard
       description: HTML dashboard for viewing metrics
       operationId: metricsDashboard
+      security: []  # public by default
       tags:
         - Monitoring
       responses:
@@ -113,6 +172,8 @@ paths:
             text/html:
               schema:
                 type: string
+        '403':
+          description: Forbidden
 
   /api/agent/register:
     post:
@@ -122,8 +183,8 @@ paths:
       tags:
         - Agents
       security:
-        - bearerAuth: []
-        - bootstrapAuth: []
+        - BearerAuth: []
+        - {} # Allow unauthenticated during bootstrap
       requestBody:
         required: true
         content:
@@ -179,7 +240,7 @@ paths:
       tags:
         - Agents
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       responses:
         '200':
           description: Token refreshed successfully
@@ -210,7 +271,7 @@ paths:
       tags:
         - Tasks
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -265,6 +326,8 @@ paths:
       operationId: listTasks
       tags:
         - Tasks
+      security:
+        - BearerAuth: []
       responses:
         '200':
           description: Tasks list
@@ -280,8 +343,9 @@ paths:
                     title:
                       type: string
                     description:
-                      type: string
-                      nullable: true
+                      oneOf:
+                        - type: string
+                        - type: "null"
                     status:
                       type: string
                     created_at:
@@ -292,6 +356,10 @@ paths:
                     - title
                     - status
                     - created_at
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden
 
   /api/task/claim:
     post:
@@ -301,7 +369,7 @@ paths:
       tags:
         - Tasks
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       responses:
         '200':
           description: Task claimed successfully
@@ -332,7 +400,7 @@ paths:
       tags:
         - Tasks
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -377,7 +445,7 @@ paths:
       tags:
         - Tasks
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       parameters:
         - name: task_id
           in: query
@@ -450,7 +518,7 @@ paths:
       tags:
         - Policy
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -500,7 +568,7 @@ paths:
       tags:
         - GitHub
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -552,7 +620,7 @@ paths:
       tags:
         - GitHub
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -607,7 +675,7 @@ paths:
       tags:
         - Webhooks
       security:
-        - hmacAuth: []
+        - HmacSig256: []
       parameters:
         - name: X-GitHub-Event
           in: header
@@ -649,58 +717,6 @@ paths:
                   - ok
         '401':
           description: Invalid HMAC signature
-
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: hex
-      description: Agent bearer token for API access
-    
-    bootstrapAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: hex
-      description: Bootstrap authentication (only when no agents exist)
-    
-    hmacAuth:
-      type: apiKey
-      in: header
-      name: X-Hub-Signature-256
-      description: GitHub webhook HMAC-SHA256 signature
-
-  responses:
-    Unauthorized:
-      description: Unauthorized - invalid or missing authentication
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              ok:
-                type: boolean
-                example: false
-              error:
-                type: string
-                example: unauthorized
-            required:
-              - ok
-              - error
-
-  schemas:
-    Error:
-      type: object
-      properties:
-        ok:
-          type: boolean
-          example: false
-        error:
-          type: string
-          example: error_description
-      required:
-        - ok
-        - error
 
 tags:
   - name: System
