@@ -9,6 +9,11 @@ jobs:
     env:
       CI: true
       npm_config_build_from_source: "false"
+      GITHUB_OWNER: InterCooperative-Network
+      GITHUB_REPO: icn-mcp
+      GITHUB_DEFAULT_BRANCH: main
+      GITHUB_WEBHOOK_SECRET: testsecret
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +25,10 @@ jobs:
       - run: npm ci
 
       - run: npm run lint
+
+      - run: mkdir -p var
+
+      - run: npm run migrate:ci --if-present
 
       - run: npm test -ws --if-present
 

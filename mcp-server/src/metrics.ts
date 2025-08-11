@@ -4,48 +4,70 @@ import client from 'prom-client';
 // Register default metrics
 client.collectDefaultMetrics();
 
-export const tasksTotal = new client.Counter({
-  name: 'icn_mcp_tasks_total',
-  help: 'Total tasks created'
-});
+// Helper function to get or create a metric to avoid double registration
+function getOrCreateCounter(name: string, help: string, labelNames?: string[]) {
+  const existing = client.register.getSingleMetric(name);
+  if (existing) return existing as client.Counter<string>;
+  const config: any = { name, help };
+  if (labelNames && labelNames.length > 0) {
+    config.labelNames = labelNames;
+  }
+  return new client.Counter(config);
+}
 
-export const policyDeniesTotal = new client.Counter({
-  name: 'icn_mcp_policy_denies_total',
-  help: 'Number of policy denies'
-});
+function getOrCreateGauge(name: string, help: string, labelNames?: string[]) {
+  const existing = client.register.getSingleMetric(name);
+  if (existing) return existing as client.Gauge<string>;
+  const config: any = { name, help };
+  if (labelNames && labelNames.length > 0) {
+    config.labelNames = labelNames;
+  }
+  return new client.Gauge(config);
+}
 
-export const prCreatesTotal = new client.Counter({
-  name: 'icn_mcp_pr_creates_total',
-  help: 'Number of PR creations by mode',
-  labelNames: ['mode'] as const
-});
+export const tasksTotal = getOrCreateCounter(
+  'icn_mcp_tasks_total',
+  'Total tasks created'
+);
 
-export const agentsTotal = new client.Gauge({
-  name: 'icn_mcp_agents_total',
-  help: 'Number of registered agents'
-});
+export const policyDeniesTotal = getOrCreateCounter(
+  'icn_mcp_policy_denies_total',
+  'Number of policy denies'
+);
 
-export const webhooksInvalidSigTotal = new client.Counter({
-  name: 'icn_mcp_webhooks_invalid_signature_total',
-  help: 'Number of GitHub webhook requests with invalid signatures'
-});
+export const prCreatesTotal = getOrCreateCounter(
+  'icn_mcp_pr_creates_total',
+  'Number of PR creations by mode',
+  ['mode']
+);
 
-export const webhooksReceivedTotal = new client.Counter({
-  name: 'icn_mcp_webhooks_received_total',
-  help: 'Number of GitHub webhook events received',
-  labelNames: ['event'] as const
-});
+export const agentsTotal = getOrCreateGauge(
+  'icn_mcp_agents_total',
+  'Number of registered agents'
+);
 
-export const claimsTotal = new client.Counter({
-  name: 'icn_mcp_claims_total',
-  help: 'Number of tasks claimed by agents'
-});
+export const webhooksInvalidSigTotal = getOrCreateCounter(
+  'icn_mcp_webhooks_invalid_signature_total',
+  'Number of GitHub webhook requests with invalid signatures'
+);
 
-export const runsTotal = new client.Counter({
-  name: 'icn_mcp_runs_total',
-  help: 'Number of task runs reported by agents',
-  labelNames: ['status'] as const
-});
+export const webhooksReceivedTotal = getOrCreateCounter(
+  'icn_mcp_webhooks_received_total',
+  'Number of GitHub webhook events received',
+  ['event']
+);
+
+export const claimsTotal = getOrCreateCounter(
+  'icn_mcp_claims_total',
+  'Number of tasks claimed by agents',
+  ['agent_kind', 'task_kind']
+);
+
+export const runsTotal = getOrCreateCounter(
+  'icn_mcp_runs_total',
+  'Number of task runs reported by agents',
+  ['status', 'agent_kind', 'task_kind']
+);
 
 const dashboardHTML = `
 <!DOCTYPE html>

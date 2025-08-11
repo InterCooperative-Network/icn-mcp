@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify from 'fastify';
-import { healthRoute, apiRoutes } from '../src/api.js';
-import { insertTask, insertDep } from '../src/db.js';
+import { healthRoute, apiRoutes } from '@/api';
+import { insertTask, insertDep } from '@/db';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'crypto';

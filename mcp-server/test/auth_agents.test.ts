@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify from 'fastify';
-import { healthRoute, apiRoutes } from '../src/api.js';
+import { healthRoute, apiRoutes } from '@/api';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -90,7 +90,7 @@ describe('agents and auth middleware', () => {
     const normalToken = (normalReg.json() as any).token;
 
     // Get database and create expired token manually
-    const { getDb } = await import('../src/db.js');
+    const { getDb } = await import('@/db');
     const db = getDb();
     const expiredToken = 'expired_token_123';
     

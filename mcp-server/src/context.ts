@@ -1,6 +1,6 @@
 import { getTaskById, getTaskDeps } from './db.js';
 import { checkPolicy } from './policy.js';
-import { GITHUB_OWNER, GITHUB_REPO } from './config.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '@/config';
 
 export interface TaskBrief {
   task: { id: string; title: string; acceptance: string[] };

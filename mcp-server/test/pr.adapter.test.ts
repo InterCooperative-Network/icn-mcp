@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify from 'fastify';
-import { apiRoutes, healthRoute } from '../src/api.js';
+import { apiRoutes, healthRoute } from '@/api';
 import fs from 'node:fs';
 import path from 'node:path';
 

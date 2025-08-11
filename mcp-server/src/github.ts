@@ -3,7 +3,7 @@ import path from 'node:path';
 import { insertArtifact } from './db.js';
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
-import { GITHUB_OWNER, GITHUB_REPO, GITHUB_DEFAULT_BRANCH } from './config.js';
+import { GITHUB_OWNER, GITHUB_REPO, GITHUB_DEFAULT_BRANCH } from '@/config';
 
 export type LocalPrFile = { path: string; content: string };
 
