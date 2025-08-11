@@ -3,12 +3,15 @@
   "codeowners_integration": true,
   "path_caps": {
     "architect": ["docs/**", "mcp-server/src/types.ts"],
-    "planner": ["tasks/**", "docs/tasks/**"],
-    "reviewer": ["docs/**", ".github/**", "ci/**", "tools/**"],
-    "ops": [".github/**", "ci/**", "tools/**", "mcp-server/src/metrics.ts"]
+    "planner": ["tasks/**", "docs/tasks/**", "workers/planner/**"],
+    "reviewer": ["docs/**", ".github/**", "ci/**", "tools/**", "workers/reviewer/**"],
+    "ops": [".github/**", "ci/**", "tools/**", "mcp-server/src/metrics.ts", "workers/ops/**"]
   },
   "reviews_required": [
-    { "paths": ["docs/protocols/**", "docs/security/**"], "reviewers": ["security", "fahertym"] },
+    { "paths": ["docs/protocols/**"], "reviewers": ["security", "fahertym"] },
+    { "paths": ["docs/security/**"], "reviewers": ["security", "fahertym"] },
+    { "paths": ["security/**"], "reviewers": ["security", "fahertym"] },
+    { "paths": ["protocols/**"], "reviewers": ["security", "fahertym"] },
     { "paths": [".github/**", "ci/**"], "reviewers": ["ops", "fahertym"] },
     { "paths": ["mcp-server/src/auth.ts", "mcp-server/src/policy.ts"], "reviewers": ["security", "fahertym"] }
   ]

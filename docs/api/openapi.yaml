@@ -1,0 +1,735 @@
+openapi: 3.1.0
+info:
+  title: ICN MCP Server API
+  description: Model Context Protocol Server for ICN (InterCooperative Network) development workflow orchestration
+  version: 0.1.0
+  contact:
+    name: ICN Team
+    url: https://github.com/InterCooperative-Network/icn-mcp
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://mcp.icn.network
+    description: Production server
+  - url: http://localhost:8787
+    description: Development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: hex
+      description: Agent bearer token for API access
+    HmacSig256:
+      type: apiKey
+      in: header
+      name: X-Hub-Signature-256
+      description: GitHub webhook HMAC-SHA256 signature
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: unauthorized
+            required:
+              - ok
+              - error
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: error_description
+      required:
+        - ok
+        - error
+
+security:
+  - BearerAuth: []
+  - HmacSig256: []
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      description: Basic health status endpoint
+      operationId: healthCheck
+      security: []  # public
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                required:
+                  - ok
+        '503':
+          description: Service unavailable
+
+  /healthz/context:
+    get:
+      summary: Configuration context
+      description: Returns effective configuration values for debugging
+      operationId: healthContext
+      security: []  # public
+      tags:
+        - System
+      responses:
+        '200':
+          description: Configuration context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  config:
+                    type: object
+                    properties:
+                      github_owner:
+                        type: string
+                        example: InterCooperative-Network
+                      github_repo:
+                        type: string
+                        example: icn-mcp
+                      github_default_branch:
+                        type: string
+                        example: main
+                      environment:
+                        type: string
+                        example: development
+                    required:
+                      - github_owner
+                      - github_repo
+                      - github_default_branch
+                      - environment
+                required:
+                  - ok
+                  - config
+        '403':
+          description: Forbidden
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      description: Prometheus-format metrics for monitoring
+      operationId: getMetrics
+      security: []  # public by default; gate via METRICS_AUTH in deployment
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Metrics in Prometheus format
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP icn_mcp_tasks_total Total tasks created
+                  # TYPE icn_mcp_tasks_total counter
+                  icn_mcp_tasks_total 42
+        '403':
+          description: Forbidden
+
+  /dashboard:
+    get:
+      summary: Metrics dashboard
+      description: HTML dashboard for viewing metrics
+      operationId: metricsDashboard
+      security: []  # public by default
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: HTML metrics dashboard
+          content:
+            text/html:
+              schema:
+                type: string
+        '403':
+          description: Forbidden
+
+  /api/agent/register:
+    post:
+      summary: Register agent
+      description: Register a new agent (bootstrap mode when no agents exist)
+      operationId: registerAgent
+      tags:
+        - Agents
+      security:
+        - BearerAuth: []
+        - {} # Allow unauthenticated during bootstrap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Agent name
+                  example: Planning Agent
+                kind:
+                  type: string
+                  enum: [planner, architect, reviewer, ops]
+                  description: Agent kind/role
+                  example: planner
+                version:
+                  type: string
+                  description: Agent version (optional)
+                  example: 1.0.0
+              required:
+                - name
+                - kind
+      responses:
+        '200':
+          description: Agent registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  id:
+                    type: string
+                    example: agent_abc123
+                  token:
+                    type: string
+                    example: 64-character-hex-token
+                required:
+                  - ok
+                  - id
+                  - token
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/agent/refresh:
+    post:
+      summary: Refresh agent token
+      description: Rotate agent token and extend expiration
+      operationId: refreshToken
+      tags:
+        - Agents
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  token:
+                    type: string
+                    example: new-64-character-hex-token
+                required:
+                  - ok
+                  - token
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent not found
+
+  /api/task/create:
+    post:
+      summary: Create task
+      description: Create a new task with optional dependencies
+      operationId: createTask
+      tags:
+        - Tasks
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Task title
+                  example: Implement user authentication
+                description:
+                  type: string
+                  description: Task description
+                  example: Add JWT-based authentication to the API
+                created_by:
+                  type: string
+                  description: Creator identifier
+                  example: agent_abc123
+                depends_on:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of task IDs this task depends on
+                  example: [task_def456, task_ghi789]
+              required:
+                - title
+      responses:
+        '200':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  id:
+                    type: string
+                    example: task_abc123
+                required:
+                  - ok
+                  - id
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/task/list:
+    get:
+      summary: List tasks
+      description: Get all tasks
+      operationId: listTasks
+      tags:
+        - Tasks
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tasks list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    title:
+                      type: string
+                    description:
+                      oneOf:
+                        - type: string
+                        - type: "null"
+                    status:
+                      type: string
+                    created_at:
+                      type: string
+                      format: date-time
+                  required:
+                    - id
+                    - title
+                    - status
+                    - created_at
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden
+
+  /api/task/claim:
+    post:
+      summary: Claim task
+      description: Claim an available task for processing
+      operationId: claimTask
+      tags:
+        - Tasks
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Task claimed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  task_id:
+                    type: string
+                    example: task_abc123
+                required:
+                  - ok
+                  - task_id
+        '404':
+          description: No tasks available to claim
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/task/run:
+    post:
+      summary: Report task run
+      description: Report task execution status and notes
+      operationId: reportTaskRun
+      tags:
+        - Tasks
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task_id:
+                  type: string
+                  example: task_abc123
+                status:
+                  type: string
+                  enum: [claimed, in_progress, completed, failed]
+                  example: completed
+                notes:
+                  type: string
+                  example: Successfully implemented authentication
+              required:
+                - task_id
+                - status
+      responses:
+        '200':
+          description: Task run reported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                required:
+                  - ok
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/task/brief:
+    get:
+      summary: Get task brief
+      description: Get comprehensive task briefing with context
+      operationId: getTaskBrief
+      tags:
+        - Tasks
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: query
+          required: true
+          schema:
+            type: string
+          example: task_abc123
+      responses:
+        '200':
+          description: Task brief
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      title:
+                        type: string
+                      acceptance:
+                        type: array
+                        items:
+                          type: string
+                  repo:
+                    type: object
+                    properties:
+                      owner:
+                        type: string
+                      repo:
+                        type: string
+                      paths:
+                        type: array
+                        items:
+                          type: string
+                  starter_files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                        hint:
+                          type: string
+                  policy:
+                    type: object
+                    properties:
+                      caps_required:
+                        type: array
+                        items:
+                          type: string
+                      write_scopes:
+                        type: array
+                        items:
+                          type: string
+                  steps:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/policy/check:
+    post:
+      summary: Check policy
+      description: Validate paths against policy rules
+      operationId: checkPolicy
+      tags:
+        - Policy
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path:
+                  type: string
+                  description: Single file path to check
+                  example: src/auth.ts
+                action:
+                  type: string
+                  enum: [read, write]
+                  description: Action type
+                  example: write
+              required:
+                - path
+                - action
+      responses:
+        '200':
+          description: Policy check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allow:
+                    type: boolean
+                    example: true
+                  reasons:
+                    type: array
+                    items:
+                      type: string
+                    example: []
+                required:
+                  - allow
+                  - reasons
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/gh/issue/create:
+    post:
+      summary: Create GitHub issue
+      description: Create issue (falls back to local artifact if no GitHub token)
+      operationId: createGitHubIssue
+      tags:
+        - GitHub
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: Bug report
+                body:
+                  type: string
+                  example: Description of the bug
+                labels:
+                  type: array
+                  items:
+                    type: string
+                  example: [bug, high-priority]
+              required:
+                - title
+                - body
+      responses:
+        '200':
+          description: Issue created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  url:
+                    type: string
+                    example: https://github.com/owner/repo/issues/123
+                  artifact:
+                    type: object
+                    description: Local artifact if GitHub integration unavailable
+                required:
+                  - ok
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/gh/pr/create:
+    post:
+      summary: Create GitHub PR
+      description: Create pull request (falls back to local artifact if no GitHub token)
+      operationId: createGitHubPR
+      tags:
+        - GitHub
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                head:
+                  type: string
+                  example: feature-branch
+                base:
+                  type: string
+                  example: main
+                title:
+                  type: string
+                  example: Add new feature
+                body:
+                  type: string
+                  example: This PR adds a new feature
+              required:
+                - head
+                - base
+                - title
+                - body
+      responses:
+        '200':
+          description: PR created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  url:
+                    type: string
+                    example: https://github.com/owner/repo/pull/123
+                  artifact:
+                    type: object
+                    description: Local artifact if GitHub integration unavailable
+                required:
+                  - ok
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /webhooks/github:
+    post:
+      summary: GitHub webhook
+      description: Handle GitHub webhook events with HMAC verification
+      operationId: githubWebhook
+      tags:
+        - Webhooks
+      security:
+        - HmacSig256: []
+      parameters:
+        - name: X-GitHub-Event
+          in: header
+          required: true
+          schema:
+            type: string
+          example: issues
+        - name: X-GitHub-Delivery
+          in: header
+          required: true
+          schema:
+            type: string
+          example: 12345678-1234-1234-1234-123456789012
+        - name: X-Hub-Signature-256
+          in: header
+          required: true
+          schema:
+            type: string
+          example: sha256=abc123...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: GitHub webhook payload (varies by event type)
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                required:
+                  - ok
+        '401':
+          description: Invalid HMAC signature
+
+tags:
+  - name: System
+    description: Health and system endpoints
+  - name: Monitoring
+    description: Metrics and monitoring
+  - name: Agents
+    description: Agent registration and authentication
+  - name: Tasks
+    description: Task management and workflow
+  - name: Policy
+    description: Policy validation and enforcement
+  - name: GitHub
+    description: GitHub integration endpoints
+  - name: Webhooks
+    description: Webhook event handling

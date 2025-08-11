@@ -1,21 +1,66 @@
 ## MCP Server API Extensions (v0.2)
 
+### Complete API Route Reference
+
+| Route | Method | Auth Required | Request Schema | Response Schema | Description |
+|-------|--------|---------------|----------------|-----------------|-------------|
+| `/healthz` | GET | No | None | `{"ok": true}` | Health check endpoint |
+| `/metrics` | GET | No | None | Prometheus metrics | Metrics in Prometheus format |
+| `/dashboard` | GET | No | None | HTML | Metrics dashboard |
+| `/api/agent/register` | POST | Bootstrap only* | `{"name": string, "kind": "planner\|architect\|reviewer\|ops", "version"?: string}` | `{"ok": true, "id": string, "token": string}` | Register new agent |
+| `/api/agent/refresh` | POST | Bearer required | `{}` | `{"ok": true, "token": string}` | Refresh agent token |
+| `/api/task/create` | POST | Bearer required | `{"title": string, "description"?: string, "created_by"?: string, "depends_on"?: string[]}` | `{"ok": true, "id": string}` | Create new task |
+| `/api/task/list` | GET | No | None | `Array<TaskRow>` | List all tasks |
+| `/api/task/claim` | POST | Bearer required | `{}` | `{"task_id": string, "title": string}` or `{"error": string}` | Claim available task |
+| `/api/task/run` | POST | Bearer required | `{"task_id": string, "status": "claimed\|in_progress\|completed\|failed", "notes"?: string}` | `{"ok": true}` | Report task execution |
+| `/api/task/status` | GET | No | Query: `task_id` | `{"id": string, "status": string}` | Get task status |
+| `/api/policy/check` | POST | Bearer required | `{"actor": string, "changedPaths": string[]}` | `{"allow": boolean, "reasons": string[]}` | Check policy compliance |
+| `/api/pr/create` | POST | Bearer required | `{"task_id": string, "title": string, "body": string, "files": Array<{"path": string, "content": string}>}` | `{"ok": true, "mode": "local\|github", ...}` | Create pull request |
+| `/api/gh/issue/create` | POST | Bearer required | `{"title": string, "body"?: string, "labels"?: string[]}` | `{"ok": true, ...}` | Create GitHub issue |
+| `/api/context/brief` | GET | No | Query: `task_id` | `TaskBrief` object | Get task context briefing |
+| `/api/webhooks/github` | POST | HMAC signature | GitHub webhook payload | `{"ok": true}` | GitHub webhook endpoint |
+
+\* Bootstrap only: First agent registration requires no auth; subsequent registrations require Bearer token.
+
+### Auth Requirements
+
+- **No Auth**: Public endpoints accessible without authentication
+- **Bearer required**: Requires `Authorization: Bearer <token>` header
+- **Bootstrap only**: First registration allowed without auth; subsequent require Bearer token
+- **HMAC signature**: Requires valid `X-Hub-Signature-256` header with WEBHOOK_SECRET
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GITHUB_OWNER` | `InterCooperative-Network` | GitHub repository owner |
+| `GITHUB_REPO` | `icn-mcp` | GitHub repository name |
+| `GITHUB_DEFAULT_BRANCH` | `main` | Default branch for PRs |
+| `GITHUB_TOKEN` | - | GitHub API token for PR creation |
+| `WEBHOOK_SECRET` | - | Secret for GitHub webhook verification |
+| `MCP_DB_PATH` | `../var/icn-mcp.sqlite` | Database file path |
+| `PORT` | `8787` | Server port |
+
 ### Webhooks
-- POST `/api/webhooks/github`
-  - HMAC (sha256) via `X-Hub-Signature-256`
-  - Env: `WEBHOOK_SECRET`
-  - Handles: `issues`, `issue_comment`, `pull_request`, `check_suite`
+
+GitHub webhook events are automatically linked to tasks when the issue/PR body contains:
+```
+Task-ID: task_abc123
+```
 
 ### Context Briefing
+
 - GET `/api/context/brief?task_id=<id>`
   - Returns TaskBrief JSON
 
 ### Worker Protocol
+
 - POST `/api/task/claim` (Bearer auth)
 - POST `/api/task/run` (Bearer auth)
 - GET `/api/task/status?task_id=<id>`
 
 ### GitHub Integration
+
 - POST `/api/gh/issue/create` (Bearer auth)
 - POST `/api/pr/create` (Bearer auth)
 

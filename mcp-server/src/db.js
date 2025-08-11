@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DB_PATH, DB_DIR, MIGRATIONS_DIR } from '../../dist/src/config.js';
+import { DB_PATH, DB_DIR, MIGRATIONS_DIR } from '@/config';
 
 let dbInstance = null;
 let dbPathInUse = null;

@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
-import { insertWebhookEvent } from './db.js';
-import { analyzePr } from './pr-coach.js';
-import { webhooksInvalidSigTotal, webhooksReceivedTotal } from './metrics.js';
+import { insertWebhookEvent } from '@/db';
+import { analyzePr } from '@/pr-coach';
+import { webhooksInvalidSigTotal, webhooksReceivedTotal } from '@/metrics';
 
 function safeStringify(body: unknown): string {
   if (typeof body === 'string') return body;
@@ -12,6 +12,28 @@ function safeStringify(body: unknown): string {
   } catch {
     return '';
   }
+}
+
+function extractTaskId(payload: any): string | undefined {
+  // Extract Task-ID marker from issue/PR bodies
+  const possibleBodies = [
+    payload?.issue?.body,
+    payload?.pull_request?.body,
+    payload?.comment?.body,
+    payload?.issue_comment?.body
+  ].filter(Boolean);
+
+  for (const body of possibleBodies) {
+    if (typeof body === 'string') {
+      // Use safer regex: /(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/
+      const match = body.match(/(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/);
+      if (match) {
+        return match[2]; // Return the second capture group (the actual task ID)
+      }
+    }
+  }
+  
+  return undefined;
 }
 
 function verifyHmac256(payload: string | Buffer, signatureHeader: string | undefined, secret: string): boolean {
@@ -54,6 +76,7 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
   const action: string | undefined = payload?.action;
   const repoFullName: string | undefined = payload?.repository?.full_name;
   const senderLogin: string | undefined = payload?.sender?.login;
+  const taskId = extractTaskId(payload);
 
   // Record event
   try {
@@ -63,9 +86,14 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
       action: action ?? '',
       repo: repoFullName ?? '',
       sender: senderLogin ?? '',
-      payload
+      payload,
+      task_id: taskId
     });
     webhooksReceivedTotal.inc({ event: event ?? 'unknown' });
+    
+    if (taskId) {
+      req.log.info({ taskId, reqId: req.id, event, action }, 'webhook linked to task');
+    }
   } catch (err) {
     req.log.error({ err, reqId: req.id }, 'failed to log webhook event');
   }

@@ -12,7 +12,7 @@ export type InsertRunInput = { task_id: string; agent: string; status: string; n
 export type InsertArtifactInput = { task_id: string; kind: string; path: string; meta?: unknown };
 export type AgentRow = { id: string; name: string; kind: string; token: string; created_at: string; expires_at?: string };
 export type InsertWebhookEventInput = {
-  event: string; delivery?: string; action?: string; repo?: string; sender?: string; payload?: unknown
+  event: string; delivery?: string; action?: string; repo?: string; sender?: string; payload?: unknown; task_id?: string;
 };
 
 let dbInstance: Database.Database | null = null;
@@ -131,12 +131,32 @@ export function getAgentByToken(token: string): AgentRow | null {
 export function countAgents(): number {
   try {
     const db = getDb();
-    const row = db.prepare('SELECT COUNT(1) as c FROM agents').get() as { c?: number };
+    const row = db.prepare('SELECT COUNT(1) as c FROM agents WHERE expires_at IS NULL OR expires_at > datetime(\'now\')').get() as { c?: number };
     return Number(row?.c ?? 0);
   } catch {
     // If table does not exist yet during bootstrap, treat as zero agents
     return 0;
   }
+}
+
+export function insertAgentBootstrap(input: { name: string; kind: string; token: string; expiresInHours?: number }): { id: string; token: string } | null {
+  const db = getDb();
+  
+  return db.transaction(() => {
+    // Check if any agents exist (double-check inside transaction)
+    const existingCount = db.prepare('SELECT COUNT(1) as c FROM agents WHERE expires_at IS NULL OR expires_at > datetime(\'now\')').get() as { c?: number };
+    if (Number(existingCount?.c ?? 0) > 0) {
+      // Someone else already registered, fail this registration
+      return null;
+    }
+    
+    // Safe to proceed with first registration
+    const id = generateId('agent');
+    const expiresInHours = input.expiresInHours ?? 24; // Default 24 hours
+    db.prepare('INSERT INTO agents (id, name, kind, token, expires_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'+\' || ? || \' hours\'))')
+      .run(id, input.name, input.kind, input.token, expiresInHours);
+    return { id, token: input.token };
+  })();
 }
 
 export function refreshAgentToken(agentId: string, newToken: string, expiresInHours: number = 24): boolean {
@@ -240,11 +260,36 @@ export function getTaskStatus(taskId: string): { id: string; status: string; age
   };
 }
 
+export function insertAgentEmergencyBootstrap(input: { name: string; kind: string; token: string; expiresInHours?: number }, emergencyToken: string): { id: string; token: string } | null {
+  // Only allow emergency bootstrap when agents table is empty or all disabled
+  const activeCount = countAgents();
+  if (activeCount > 0) {
+    return null; // Emergency bootstrap only when no active agents
+  }
+  
+  // Verify emergency token
+  const expectedToken = process.env.MCP_BOOTSTRAP_TOKEN;
+  if (!expectedToken || emergencyToken !== expectedToken) {
+    return null; // Invalid emergency token
+  }
+  
+  const db = getDb();
+  const id = generateId('agent');
+  const expiresInHours = input.expiresInHours ?? 24;
+  db.prepare('INSERT INTO agents (id, name, kind, token, expires_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'+\' || ? || \' hours\'))')
+    .run(id, input.name, input.kind, input.token, expiresInHours);
+  
+  // Clear the emergency token after use (by unsetting the env var)
+  // Note: This won't persist across restarts but provides single-use semantics
+  delete process.env.MCP_BOOTSTRAP_TOKEN;
+  
+  return { id, token: input.token };
+}
 export function insertWebhookEvent(input: InsertWebhookEventInput): { id: string } {
   const db = getDb();
   const id = generateId('wh');
   const stmt = db.prepare(
-    'INSERT INTO webhook_events (id, event, delivery, action, repo, sender, payload) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO webhook_events (id, event, delivery, action, repo, sender, payload, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   stmt.run(
     id,
@@ -253,7 +298,8 @@ export function insertWebhookEvent(input: InsertWebhookEventInput): { id: string
     input.action ?? null,
     input.repo ?? null,
     input.sender ?? null,
-    input.payload ? JSON.stringify(input.payload) : null
+    input.payload ? JSON.stringify(input.payload) : null,
+    input.task_id ?? null
   );
   return { id };
 }

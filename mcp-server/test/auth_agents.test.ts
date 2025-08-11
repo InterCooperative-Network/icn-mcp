@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify from 'fastify';
-import { healthRoute, apiRoutes } from '../src/api.js';
+import { healthRoute, apiRoutes } from '@/api';
 import fs from 'node:fs';
 import path from 'node:path';
 
 describe('agents and auth middleware', () => {
-  const testDb = path.resolve(process.cwd(), `var/test-${Date.now()}-${Math.random()}.sqlite`);
   beforeEach(() => {
+    // Use a unique DB for each test to ensure isolation
+    const testDb = path.resolve(process.cwd(), `var/test-auth-${Date.now()}-${Math.random()}.sqlite`);
     process.env.MCP_DB_PATH = testDb;
     try { fs.unlinkSync(testDb); } catch {/* noop */}
     try { fs.rmSync(path.resolve(process.cwd(), 'artifacts'), { recursive: true, force: true }); } catch {/* noop */}
@@ -45,9 +46,10 @@ describe('agents and auth middleware', () => {
     const created = okTask.json() as any;
     expect(created.id).toBeTruthy();
 
-    // Second register now requires token
+    // Second register now requires token - this tests the strict bootstrap enforcement
     const reg2NoAuth = await app.inject({ method: 'POST', url: '/api/agent/register', payload: { name: 'A2', kind: 'ops' } });
     expect(reg2NoAuth.statusCode).toBe(401);
+    expect(reg2NoAuth.json()).toEqual({ ok: false, error: 'unauthorized' });
 
     const reg2 = await app.inject({
       method: 'POST',
@@ -88,7 +90,7 @@ describe('agents and auth middleware', () => {
     const normalToken = (normalReg.json() as any).token;
 
     // Get database and create expired token manually
-    const { getDb } = await import('../src/db.js');
+    const { getDb } = await import('@/db');
     const db = getDb();
     const expiredToken = 'expired_token_123';
     
