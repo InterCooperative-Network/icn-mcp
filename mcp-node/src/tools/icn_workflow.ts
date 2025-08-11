@@ -10,6 +10,10 @@ export interface StartWorkflowParams {
   templateId: string;
   initialData?: Record<string, any>;
   sourceRequestId?: string;
+  authContext?: {
+    agentName: string;
+    agentKind: string;
+  };
 }
 
 export interface StartWorkflowResponse {
@@ -36,6 +40,10 @@ export interface CreateCheckpointParams {
   notes?: string;
   completeStep?: boolean;
   sourceRequestId?: string;
+  authContext?: {
+    agentName: string;
+    agentKind: string;
+  };
 }
 
 export interface CreateCheckpointResponse {
@@ -57,7 +65,10 @@ export async function icnStartWorkflow(
   params: StartWorkflowParams,
   createdBy?: string
 ): Promise<StartWorkflowResponse> {
-  const { templateId, initialData = {}, sourceRequestId } = params;
+  const { templateId, initialData = {}, sourceRequestId, authContext } = params;
+
+  // Use authContext if provided, fallback to createdBy parameter
+  const actualCreatedBy = authContext?.agentName || createdBy || 'unknown';
 
   // Get template to validate it exists
   const template = workflowEngine.getTemplate(templateId);
@@ -74,7 +85,7 @@ export async function icnStartWorkflow(
   const workflowId = await workflowEngine.startWorkflow(
     templateId, 
     initialData, 
-    createdBy,
+    actualCreatedBy,
     sourceRequestId
   );
   
@@ -136,11 +147,16 @@ export async function icnGetNextStep(params: GetNextStepParams): Promise<GetNext
  * Create a checkpoint and optionally complete the current step
  */
 export async function icnCheckpoint(params: CreateCheckpointParams): Promise<CreateCheckpointResponse> {
-  const { workflowId, stepId, data, notes, completeStep = false, sourceRequestId } = params;
+  const { workflowId, stepId, data, notes, completeStep = false, sourceRequestId, authContext } = params;
 
   const state = workflowEngine.getWorkflowState(workflowId);
   if (!state) {
     throw new Error(`Workflow not found: ${workflowId}`);
+  }
+
+  // Basic authorization check if authContext is provided
+  if (authContext && state.createdBy !== authContext.agentName && authContext.agentKind !== 'admin') {
+    throw new Error('Access denied: insufficient permissions to modify this workflow');
   }
 
   // Create checkpoint
