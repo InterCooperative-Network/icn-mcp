@@ -1,0 +1,161 @@
+{
+  "id": "add-mcp-tool-workflow",
+  "name": "Add MCP Tool Workflow",
+  "description": "Complete workflow for adding a new MCP tool to the ICN system",
+  "category": "development",
+  "tags": ["mcp", "tools", "typescript", "development"],
+  "steps": [
+    {
+      "id": "design-interface",
+      "title": "Design Tool Interface",
+      "description": "Define TypeScript interfaces for the new tool",
+      "actions": [
+        "Create request interface with required parameters",
+        "Create response interface with structured data",
+        "Consider optional parameters and error cases",
+        "Add JSDoc comments for API documentation",
+        "Validate interface follows existing patterns"
+      ],
+      "validation": [
+        "Interfaces match existing tool patterns",
+        "All properties have appropriate types",
+        "Required vs optional parameters are clearly defined",
+        "JSDoc comments are comprehensive"
+      ]
+    },
+    {
+      "id": "implement-tool",
+      "title": "Implement Tool Logic",
+      "description": "Create the tool implementation file",
+      "actions": [
+        "Create new file in mcp-node/src/tools/",
+        "Implement main function with proper error handling",
+        "Add input validation",
+        "Implement core business logic",
+        "Add logging and debugging support"
+      ],
+      "dependencies": ["design-interface"],
+      "validation": [
+        "Tool follows async function pattern",
+        "Proper error handling is implemented",
+        "Input validation covers all edge cases",
+        "Function is exported properly"
+      ]
+    },
+    {
+      "id": "update-manifest",
+      "title": "Update Tool Manifest",
+      "description": "Register the new tool in the manifest",
+      "actions": [
+        "Add tool definition to manifest.ts",
+        "Define input schema with proper validation",
+        "Add description and documentation",
+        "Test schema validation"
+      ],
+      "dependencies": ["design-interface"],
+      "validation": [
+        "Tool is properly registered in manifest",
+        "Input schema matches implementation",
+        "Description is clear and helpful",
+        "Required parameters are correctly specified"
+      ]
+    },
+    {
+      "id": "register-in-server",
+      "title": "Register Tool in Server",
+      "description": "Add tool handler to the MCP server",
+      "actions": [
+        "Import tool function in server.ts",
+        "Add case statement for tool handling",
+        "Implement parameter extraction and validation",
+        "Add proper error handling and response formatting"
+      ],
+      "dependencies": ["implement-tool", "update-manifest"],
+      "validation": [
+        "Tool is imported correctly",
+        "Case statement handles tool properly",
+        "Parameter validation is comprehensive",
+        "Error responses are properly formatted"
+      ]
+    },
+    {
+      "id": "write-tests",
+      "title": "Write Comprehensive Tests",
+      "description": "Create tests for the new tool",
+      "actions": [
+        "Add test cases to tools.test.ts",
+        "Test successful operation with valid inputs",
+        "Test error cases with invalid inputs",
+        "Test edge cases and boundary conditions",
+        "Verify response format matches interface"
+      ],
+      "dependencies": ["implement-tool"],
+      "validation": [
+        "All success paths are tested",
+        "Error cases are covered",
+        "Edge cases are handled",
+        "Test coverage is comprehensive"
+      ]
+    },
+    {
+      "id": "build-and-test",
+      "title": "Build and Test",
+      "description": "Ensure everything builds and tests pass",
+      "actions": [
+        "Run npm run build to check compilation",
+        "Run npm test to verify all tests pass",
+        "Run npm run lint to check code style",
+        "Fix any issues that arise"
+      ],
+      "dependencies": ["register-in-server", "write-tests"],
+      "validation": [
+        "Build succeeds without errors",
+        "All tests pass",
+        "Lint checks pass",
+        "No TypeScript compilation errors"
+      ]
+    },
+    {
+      "id": "manual-testing",
+      "title": "Manual Testing",
+      "description": "Test the tool manually through the MCP server",
+      "actions": [
+        "Start the MCP server",
+        "Test tool through GitHub Copilot or direct MCP client",
+        "Verify tool appears in available tools list",
+        "Test with various input scenarios",
+        "Verify error handling works as expected"
+      ],
+      "dependencies": ["build-and-test"],
+      "validation": [
+        "Tool is discoverable",
+        "Tool executes successfully with valid inputs",
+        "Error messages are helpful",
+        "Response format is correct"
+      ]
+    },
+    {
+      "id": "documentation",
+      "title": "Update Documentation",
+      "description": "Document the new tool",
+      "actions": [
+        "Add tool to tools documentation",
+        "Include usage examples",
+        "Document parameters and responses",
+        "Update any relevant architecture docs"
+      ],
+      "dependencies": ["manual-testing"],
+      "validation": [
+        "Documentation is clear and complete",
+        "Examples are working and helpful",
+        "Parameter documentation matches implementation",
+        "Architecture docs are updated if needed"
+      ]
+    }
+  ],
+  "metadata": {
+    "estimatedDuration": "2-4 hours",
+    "difficulty": "medium",
+    "prerequisites": ["TypeScript knowledge", "MCP protocol understanding"]
+  }
+}

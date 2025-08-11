@@ -1,0 +1,165 @@
+{
+  "id": "complex-feature-development",
+  "name": "Complex Feature Development Workflow",
+  "description": "Multi-step workflow for developing complex features across multiple components",
+  "category": "development",
+  "tags": ["feature", "development", "planning", "implementation"],
+  "steps": [
+    {
+      "id": "requirements-analysis",
+      "title": "Requirements Analysis",
+      "description": "Analyze and document feature requirements",
+      "actions": [
+        "Review feature request and acceptance criteria",
+        "Identify affected components and systems",
+        "Document technical requirements",
+        "Identify potential risks and dependencies",
+        "Create implementation timeline"
+      ],
+      "validation": [
+        "Requirements are clearly documented",
+        "Dependencies are identified",
+        "Timeline is realistic",
+        "Risks are assessed and mitigated"
+      ]
+    },
+    {
+      "id": "architecture-design",
+      "title": "Architecture Design",
+      "description": "Design the technical architecture for the feature",
+      "actions": [
+        "Create system architecture diagrams",
+        "Define API contracts and interfaces",
+        "Plan database schema changes",
+        "Design component interactions",
+        "Review with technical team"
+      ],
+      "dependencies": ["requirements-analysis"],
+      "validation": [
+        "Architecture supports all requirements",
+        "APIs are well-defined",
+        "Database changes are planned",
+        "Team has reviewed and approved design"
+      ]
+    },
+    {
+      "id": "create-tasks",
+      "title": "Break Down Into Tasks",
+      "description": "Create specific implementation tasks",
+      "actions": [
+        "Break feature into implementable tasks",
+        "Estimate effort for each task",
+        "Define task dependencies",
+        "Assign priorities",
+        "Create task tracking tickets"
+      ],
+      "dependencies": ["architecture-design"],
+      "validation": [
+        "All tasks are clearly defined",
+        "Dependencies are mapped",
+        "Estimates are reasonable",
+        "Tasks are trackable"
+      ]
+    },
+    {
+      "id": "setup-development",
+      "title": "Setup Development Environment",
+      "description": "Prepare development environment and tooling",
+      "actions": [
+        "Create feature branch",
+        "Setup development database/environment",
+        "Configure testing environment",
+        "Install any new dependencies",
+        "Setup monitoring and logging"
+      ],
+      "dependencies": ["create-tasks"],
+      "validation": [
+        "Development environment is ready",
+        "All tools are properly configured",
+        "Branch is created and pushed",
+        "Dependencies are resolved"
+      ]
+    },
+    {
+      "id": "implement-core",
+      "title": "Implement Core Functionality",
+      "description": "Implement the main feature logic",
+      "actions": [
+        "Implement core business logic",
+        "Create necessary data models",
+        "Implement API endpoints",
+        "Add error handling",
+        "Write unit tests"
+      ],
+      "dependencies": ["setup-development"],
+      "validation": [
+        "Core functionality works as designed",
+        "All APIs are implemented",
+        "Error handling is comprehensive",
+        "Unit tests have good coverage"
+      ]
+    },
+    {
+      "id": "integration-testing",
+      "title": "Integration Testing",
+      "description": "Test feature integration with existing systems",
+      "actions": [
+        "Write integration tests",
+        "Test API integrations",
+        "Verify database operations",
+        "Test error scenarios",
+        "Performance testing"
+      ],
+      "dependencies": ["implement-core"],
+      "validation": [
+        "Integration tests pass",
+        "APIs work correctly with other systems",
+        "Performance meets requirements",
+        "Error handling works end-to-end"
+      ]
+    },
+    {
+      "id": "user-acceptance",
+      "title": "User Acceptance Testing",
+      "description": "Validate feature meets user requirements",
+      "actions": [
+        "Deploy to staging environment",
+        "Conduct user acceptance tests",
+        "Gather feedback from stakeholders",
+        "Document any issues or changes needed",
+        "Get sign-off from product owner"
+      ],
+      "dependencies": ["integration-testing"],
+      "validation": [
+        "Feature deployed to staging successfully",
+        "All acceptance criteria are met",
+        "Stakeholder feedback is positive",
+        "Product owner has signed off"
+      ]
+    },
+    {
+      "id": "production-deployment",
+      "title": "Production Deployment",
+      "description": "Deploy feature to production",
+      "actions": [
+        "Prepare deployment plan",
+        "Deploy to production",
+        "Monitor deployment metrics",
+        "Verify feature works in production",
+        "Update documentation"
+      ],
+      "dependencies": ["user-acceptance"],
+      "validation": [
+        "Deployment completed successfully",
+        "Feature is working in production",
+        "Monitoring shows healthy metrics",
+        "Documentation is updated"
+      ]
+    }
+  ],
+  "metadata": {
+    "estimatedDuration": "2-4 weeks",
+    "difficulty": "high",
+    "prerequisites": ["Architecture knowledge", "Development experience", "Testing expertise"]
+  }
+}

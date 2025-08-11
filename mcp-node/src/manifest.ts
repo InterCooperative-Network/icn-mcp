@@ -116,6 +116,93 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['task_description']
       }
+    },
+    {
+      name: 'icn_start_workflow',
+      description: 'Start a new workflow from a template for complex multi-step tasks',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          templateId: {
+            type: 'string',
+            description: 'ID of the workflow template to start'
+          },
+          initialData: {
+            type: 'object',
+            description: 'Optional initial data for the workflow',
+            additionalProperties: true
+          }
+        },
+        required: ['templateId']
+      }
+    },
+    {
+      name: 'icn_get_next_step',
+      description: 'Get the next step in an active workflow',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workflowId: {
+            type: 'string',
+            description: 'ID of the workflow to get next step for'
+          }
+        },
+        required: ['workflowId']
+      }
+    },
+    {
+      name: 'icn_checkpoint',
+      description: 'Create a checkpoint to save workflow progress and optionally complete current step',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workflowId: {
+            type: 'string',
+            description: 'ID of the workflow to checkpoint'
+          },
+          stepId: {
+            type: 'string',
+            description: 'ID of the current step being checkpointed'
+          },
+          data: {
+            type: 'object',
+            description: 'Data to save in the checkpoint',
+            additionalProperties: true
+          },
+          notes: {
+            type: 'string',
+            description: 'Optional notes about the checkpoint'
+          },
+          completeStep: {
+            type: 'boolean',
+            description: 'Whether to mark the current step as complete',
+            default: false
+          }
+        },
+        required: ['workflowId', 'stepId', 'data']
+      }
+    },
+    {
+      name: 'icn_list_workflow_templates',
+      description: 'List available workflow templates',
+      inputSchema: {
+        type: 'object',
+        properties: {}
+      }
+    },
+    {
+      name: 'icn_get_workflow_state',
+      description: 'Get current state and history of a workflow',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workflowId: {
+            type: 'string',
+            description: 'ID of the workflow to get state for'
+          }
+        },
+        required: ['workflowId']
+      }
     }
   ];
 }
