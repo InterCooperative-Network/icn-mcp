@@ -1,5 +1,6 @@
 {
   "id": "add-mcp-tool-workflow",
+  "version": "1.0.0",
   "name": "Add MCP Tool Workflow",
   "description": "Complete workflow for adding a new MCP tool to the ICN system",
   "category": "development",
@@ -16,12 +17,13 @@
         "Add JSDoc comments for API documentation",
         "Validate interface follows existing patterns"
       ],
-      "validation": [
-        "Interfaces match existing tool patterns",
-        "All properties have appropriate types",
-        "Required vs optional parameters are clearly defined",
-        "JSDoc comments are comprehensive"
-      ]
+      "validation": {
+        "requiredFlags": [
+          "interface_designed",
+          "schema_created"
+        ]
+      },
+      "dependsOn": []
     },
     {
       "id": "implement-tool",
@@ -34,13 +36,14 @@
         "Implement core business logic",
         "Add logging and debugging support"
       ],
-      "dependencies": ["design-interface"],
-      "validation": [
-        "Tool follows async function pattern",
-        "Proper error handling is implemented",
-        "Input validation covers all edge cases",
-        "Function is exported properly"
-      ]
+      "dependsOn": ["design-interface"],
+      "validation": {
+        "requiredFlags": [
+          "tool_implemented",
+          "error_handling_added",
+          "validation_added"
+        ]
+      }
     },
     {
       "id": "update-manifest",
@@ -52,110 +55,109 @@
         "Add description and documentation",
         "Test schema validation"
       ],
-      "dependencies": ["design-interface"],
-      "validation": [
-        "Tool is properly registered in manifest",
-        "Input schema matches implementation",
-        "Description is clear and helpful",
-        "Required parameters are correctly specified"
-      ]
-    },
-    {
-      "id": "register-in-server",
-      "title": "Register Tool in Server",
-      "description": "Add tool handler to the MCP server",
-      "actions": [
-        "Import tool function in server.ts",
-        "Add case statement for tool handling",
-        "Implement parameter extraction and validation",
-        "Add proper error handling and response formatting"
-      ],
-      "dependencies": ["implement-tool", "update-manifest"],
-      "validation": [
-        "Tool is imported correctly",
-        "Case statement handles tool properly",
-        "Parameter validation is comprehensive",
-        "Error responses are properly formatted"
-      ]
+      "dependsOn": ["implement-tool"],
+      "validation": {
+        "requiredFlags": [
+          "manifest_updated",
+          "schema_defined"
+        ]
+      }
     },
     {
       "id": "write-tests",
-      "title": "Write Comprehensive Tests",
-      "description": "Create tests for the new tool",
+      "title": "Write Unit Tests",
+      "description": "Create comprehensive tests for the new tool",
       "actions": [
-        "Add test cases to tools.test.ts",
-        "Test successful operation with valid inputs",
-        "Test error cases with invalid inputs",
-        "Test edge cases and boundary conditions",
-        "Verify response format matches interface"
+        "Create test file following naming convention",
+        "Write tests for happy path scenarios",
+        "Write tests for error cases",
+        "Test edge cases and validation",
+        "Ensure good test coverage"
       ],
-      "dependencies": ["implement-tool"],
-      "validation": [
-        "All success paths are tested",
-        "Error cases are covered",
-        "Edge cases are handled",
-        "Test coverage is comprehensive"
-      ]
+      "dependsOn": ["implement-tool"],
+      "validation": {
+        "requiredFlags": [
+          "tests_written",
+          "coverage_adequate"
+        ]
+      }
     },
     {
-      "id": "build-and-test",
-      "title": "Build and Test",
-      "description": "Ensure everything builds and tests pass",
+      "id": "integration-test",
+      "title": "Integration Testing",
+      "description": "Test the tool in the MCP server context",
       "actions": [
-        "Run npm run build to check compilation",
-        "Run npm test to verify all tests pass",
-        "Run npm run lint to check code style",
-        "Fix any issues that arise"
+        "Start MCP server with new tool",
+        "Test tool via MCP protocol",
+        "Verify error handling works",
+        "Check tool appears in manifest",
+        "Test with real parameters"
       ],
-      "dependencies": ["register-in-server", "write-tests"],
-      "validation": [
-        "Build succeeds without errors",
-        "All tests pass",
-        "Lint checks pass",
-        "No TypeScript compilation errors"
-      ]
+      "dependsOn": ["update-manifest", "write-tests"],
+      "validation": {
+        "requiredFlags": [
+          "integration_tested",
+          "mcp_protocol_verified"
+        ]
+      }
     },
     {
-      "id": "manual-testing",
-      "title": "Manual Testing",
-      "description": "Test the tool manually through the MCP server",
+      "id": "add-documentation",
+      "title": "Add Documentation",
+      "description": "Document the new tool for users",
       "actions": [
-        "Start the MCP server",
-        "Test tool through GitHub Copilot or direct MCP client",
-        "Verify tool appears in available tools list",
-        "Test with various input scenarios",
-        "Verify error handling works as expected"
-      ],
-      "dependencies": ["build-and-test"],
-      "validation": [
-        "Tool is discoverable",
-        "Tool executes successfully with valid inputs",
-        "Error messages are helpful",
-        "Response format is correct"
-      ]
-    },
-    {
-      "id": "documentation",
-      "title": "Update Documentation",
-      "description": "Document the new tool",
-      "actions": [
-        "Add tool to tools documentation",
-        "Include usage examples",
+        "Add tool to API documentation",
+        "Create usage examples",
         "Document parameters and responses",
-        "Update any relevant architecture docs"
+        "Add troubleshooting guide",
+        "Update any relevant guides"
       ],
-      "dependencies": ["manual-testing"],
-      "validation": [
-        "Documentation is clear and complete",
-        "Examples are working and helpful",
-        "Parameter documentation matches implementation",
-        "Architecture docs are updated if needed"
-      ]
+      "dependsOn": ["integration-test"],
+      "validation": {
+        "requiredFlags": [
+          "documentation_added",
+          "examples_created"
+        ]
+      }
+    },
+    {
+      "id": "code-review",
+      "title": "Code Review and Quality Check",
+      "description": "Ensure code quality and get peer review",
+      "actions": [
+        "Run linting and fix any issues",
+        "Run build and ensure no TypeScript errors",
+        "Submit PR for code review",
+        "Address review feedback",
+        "Ensure CI passes"
+      ],
+      "dependsOn": ["add-documentation"],
+      "validation": {
+        "requiredFlags": [
+          "linting_passed",
+          "build_successful",
+          "review_completed"
+        ]
+      }
+    },
+    {
+      "id": "deploy-tool",
+      "title": "Deploy and Monitor",
+      "description": "Deploy the tool and monitor its usage",
+      "actions": [
+        "Merge approved PR",
+        "Monitor tool usage metrics",
+        "Check for any runtime errors",
+        "Gather user feedback",
+        "Plan any improvements"
+      ],
+      "dependsOn": ["code-review"],
+      "validation": {
+        "requiredFlags": [
+          "deployed_successfully",
+          "monitoring_setup"
+        ]
+      }
     }
-  ],
-  "metadata": {
-    "estimatedDuration": "2-4 hours",
-    "difficulty": "medium",
-    "prerequisites": ["TypeScript knowledge", "MCP protocol understanding"]
-  }
+  ]
 }

@@ -1,5 +1,6 @@
 {
   "id": "debug-workflow",
+  "version": "1.0.0",
   "name": "Debug Issue Workflow",
   "description": "Systematic workflow for debugging and fixing issues",
   "category": "debugging",
@@ -16,114 +17,110 @@
         "Document expected vs actual behavior",
         "Verify issue exists in current codebase"
       ],
-      "validation": [
-        "Issue can be reproduced consistently",
-        "Reproduction steps are documented",
-        "Expected behavior is clearly defined",
-        "Issue is confirmed in current version"
-      ]
+      "validation": {
+        "requiredFlags": [
+          "issue_reproduced",
+          "steps_documented"
+        ]
+      },
+      "dependsOn": []
     },
     {
-      "id": "analyze-logs",
-      "title": "Analyze Logs and Error Messages",
-      "description": "Examine logs, error messages, and stack traces",
+      "id": "analyze-root-cause",
+      "title": "Analyze Root Cause",
+      "description": "Investigate and identify the underlying cause",
       "actions": [
-        "Collect relevant log files",
-        "Analyze error messages and stack traces",
-        "Identify patterns in the errors",
-        "Check system resource usage",
-        "Review recent code changes"
+        "Add debugging statements or breakpoints",
+        "Trace code execution path",
+        "Examine logs and error messages",
+        "Review recent changes that might have caused the issue",
+        "Identify the specific component or function causing the problem"
       ],
-      "dependencies": ["reproduce-issue"],
-      "validation": [
-        "All relevant logs are collected",
-        "Error patterns are identified",
-        "Resource issues are ruled out",
-        "Recent changes are analyzed"
-      ]
+      "dependsOn": ["reproduce-issue"],
+      "validation": {
+        "requiredFlags": [
+          "root_cause_identified",
+          "investigation_complete"
+        ]
+      }
     },
     {
-      "id": "isolate-root-cause",
-      "title": "Isolate Root Cause",
-      "description": "Identify the specific component or code causing the issue",
+      "id": "design-fix",
+      "title": "Design the Fix",
+      "description": "Plan the solution approach",
       "actions": [
-        "Use debugging tools and breakpoints",
-        "Add targeted logging",
-        "Test individual components",
-        "Review related code sections",
-        "Check configuration and environment"
+        "Consider multiple solution approaches",
+        "Evaluate impact of each approach",
+        "Choose the safest and most maintainable solution",
+        "Plan implementation steps",
+        "Consider edge cases and potential side effects"
       ],
-      "dependencies": ["analyze-logs"],
-      "validation": [
-        "Root cause is identified",
-        "Faulty component is isolated",
-        "Debugging evidence supports conclusion",
-        "Environment factors are considered"
-      ]
+      "dependsOn": ["analyze-root-cause"],
+      "validation": {
+        "requiredFlags": [
+          "solution_designed",
+          "approach_validated"
+        ]
+      }
     },
     {
-      "id": "develop-fix",
-      "title": "Develop and Test Fix",
-      "description": "Create a fix for the identified issue",
+      "id": "implement-fix",
+      "title": "Implement the Fix",
+      "description": "Code and implement the solution",
       "actions": [
-        "Design solution approach",
-        "Implement the fix",
-        "Write or update tests",
-        "Test fix against reproduction case",
-        "Test for regression issues"
+        "Make minimal changes to fix the issue",
+        "Follow coding standards and conventions",
+        "Add appropriate error handling",
+        "Update related documentation if needed",
+        "Ensure fix doesn't break existing functionality"
       ],
-      "dependencies": ["isolate-root-cause"],
-      "validation": [
-        "Fix addresses the root cause",
-        "Reproduction case now passes",
-        "No new issues are introduced",
-        "Tests cover the fix"
-      ]
+      "dependsOn": ["design-fix"],
+      "validation": {
+        "requiredFlags": [
+          "fix_implemented",
+          "code_reviewed"
+        ]
+      }
     },
     {
-      "id": "validate-solution",
-      "title": "Validate Solution",
-      "description": "Ensure the fix works in all scenarios",
+      "id": "test-fix",
+      "title": "Test the Fix",
+      "description": "Verify the fix resolves the issue",
       "actions": [
-        "Test fix in different environments",
-        "Run full test suite",
-        "Test edge cases and boundary conditions",
-        "Get code review from team",
-        "Verify performance impact"
+        "Test the original reproduction case",
+        "Run existing test suite",
+        "Add new tests for the bug scenario",
+        "Test edge cases and related functionality",
+        "Perform regression testing"
       ],
-      "dependencies": ["develop-fix"],
-      "validation": [
-        "Fix works in all test environments",
-        "All existing tests still pass",
-        "Edge cases are handled",
-        "Code review is complete",
-        "Performance is acceptable"
-      ]
+      "dependsOn": ["implement-fix"],
+      "validation": {
+        "requiredFlags": [
+          "fix_tested",
+          "regression_tested",
+          "tests_added"
+        ]
+      }
     },
     {
       "id": "deploy-and-monitor",
       "title": "Deploy and Monitor",
-      "description": "Deploy the fix and monitor for success",
+      "description": "Deploy the fix and monitor for issues",
       "actions": [
-        "Deploy fix to staging/production",
-        "Monitor application metrics",
-        "Verify issue is resolved",
+        "Deploy fix to staging environment",
         "Monitor for any new issues",
-        "Update documentation if needed"
+        "Deploy to production if staging is successful",
+        "Monitor production for the fixed issue",
+        "Document lessons learned"
       ],
-      "dependencies": ["validate-solution"],
-      "validation": [
-        "Fix is successfully deployed",
-        "Original issue is resolved",
-        "No new issues have appeared",
-        "Monitoring shows healthy metrics",
-        "Documentation is updated"
-      ]
+      "dependsOn": ["test-fix"],
+      "validation": {
+        "requiredFlags": [
+          "fix_deployed",
+          "monitoring_confirmed",
+          "issue_resolved"
+        ]
+      }
     }
-  ],
-  "metadata": {
-    "estimatedDuration": "2 hours - 2 days",
-    "difficulty": "medium",
-    "prerequisites": ["Debugging skills", "System knowledge", "Testing experience"]
-  }
+  ]
 }

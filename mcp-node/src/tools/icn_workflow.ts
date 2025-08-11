@@ -1,14 +1,15 @@
 import { 
   workflowEngine, 
-  WorkflowTemplate, 
   WorkflowState, 
   WorkflowNextStep, 
   WorkflowCheckpoint 
 } from '../workflow-engine.js';
+import { WorkflowTemplate } from '../workflows/schema.js';
 
 export interface StartWorkflowParams {
   templateId: string;
   initialData?: Record<string, any>;
+  sourceRequestId?: string;
 }
 
 export interface StartWorkflowResponse {
@@ -34,6 +35,7 @@ export interface CreateCheckpointParams {
   data: Record<string, any>;
   notes?: string;
   completeStep?: boolean;
+  sourceRequestId?: string;
 }
 
 export interface CreateCheckpointResponse {
@@ -51,8 +53,11 @@ export interface ListTemplatesResponse {
 /**
  * Start a new workflow from a template
  */
-export async function icnStartWorkflow(params: StartWorkflowParams): Promise<StartWorkflowResponse> {
-  const { templateId, initialData = {} } = params;
+export async function icnStartWorkflow(
+  params: StartWorkflowParams,
+  createdBy?: string
+): Promise<StartWorkflowResponse> {
+  const { templateId, initialData = {}, sourceRequestId } = params;
 
   // Get template to validate it exists
   const template = workflowEngine.getTemplate(templateId);
@@ -66,11 +71,16 @@ export async function icnStartWorkflow(params: StartWorkflowParams): Promise<Sta
   }
 
   // Start the workflow
-  const workflowId = workflowEngine.startWorkflow(templateId, initialData);
+  const workflowId = await workflowEngine.startWorkflow(
+    templateId, 
+    initialData, 
+    createdBy,
+    sourceRequestId
+  );
   
   // Get initial state and next step
   const state = workflowEngine.getWorkflowState(workflowId);
-  const nextStep = workflowEngine.getNextStep(workflowId);
+  const nextStep = await workflowEngine.getNextStep(workflowId);
 
   if (!state) {
     throw new Error('Failed to create workflow state');
@@ -95,7 +105,7 @@ export async function icnGetNextStep(params: GetNextStepParams): Promise<GetNext
     throw new Error(`Workflow not found: ${workflowId}`);
   }
 
-  const nextStep = workflowEngine.getNextStep(workflowId);
+  const nextStep = await workflowEngine.getNextStep(workflowId);
   
   // Generate available actions based on current step
   const availableActions: string[] = [];
@@ -126,7 +136,7 @@ export async function icnGetNextStep(params: GetNextStepParams): Promise<GetNext
  * Create a checkpoint and optionally complete the current step
  */
 export async function icnCheckpoint(params: CreateCheckpointParams): Promise<CreateCheckpointResponse> {
-  const { workflowId, stepId, data, notes, completeStep = false } = params;
+  const { workflowId, stepId, data, notes, completeStep = false, sourceRequestId } = params;
 
   const state = workflowEngine.getWorkflowState(workflowId);
   if (!state) {
@@ -134,16 +144,22 @@ export async function icnCheckpoint(params: CreateCheckpointParams): Promise<Cre
   }
 
   // Create checkpoint
-  const checkpoint = workflowEngine.createCheckpoint(workflowId, stepId, data, notes);
+  const checkpoint = await workflowEngine.createCheckpoint(
+    workflowId, 
+    stepId, 
+    data, 
+    notes,
+    sourceRequestId
+  );
 
   // Complete step if requested
   if (completeStep) {
-    workflowEngine.completeStep(workflowId, stepId, data);
+    await workflowEngine.completeStep(workflowId, stepId, data, sourceRequestId);
   }
 
   // Get updated state and next step
   const updatedState = workflowEngine.getWorkflowState(workflowId);
-  const nextStep = workflowEngine.getNextStep(workflowId);
+  const nextStep = await workflowEngine.getNextStep(workflowId);
 
   if (!updatedState) {
     throw new Error('Failed to get updated workflow state');
@@ -163,7 +179,7 @@ export async function icnListWorkflowTemplates(): Promise<ListTemplatesResponse>
   const templates = workflowEngine.getAvailableTemplates();
   
   // Extract unique categories and tags
-  const categories = Array.from(new Set(templates.map(t => t.category))).sort();
+  const categories = Array.from(new Set(templates.map(t => t.category).filter((c): c is string => typeof c === 'string'))).sort();
   const tags = Array.from(new Set(templates.flatMap(t => t.tags || []))).sort();
 
   return {
