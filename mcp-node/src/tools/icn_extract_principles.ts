@@ -69,7 +69,7 @@ export async function icnExtractPrinciples(request: PrincipleExtractionRequest):
         hash: generateHash(request.content)
       };
 
-      const extractedPrinciples = await (ingester as any).extractPrinciples(request.content, metadata);
+      const extractedPrinciples = await ingester.extractPrinciples(request.content, metadata);
       
       for (const principle of extractedPrinciples) {
         if (!request.types || request.types.includes(principle.type as any)) {

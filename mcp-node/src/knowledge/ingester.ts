@@ -69,7 +69,7 @@ export class DocumentIngester extends EventEmitter {
    * Stop watching directories and clean up resources
    */
   async stopWatching(): Promise<void> {
-    for (const [dir, watcher] of this.watchers) {
+    for (const [, watcher] of this.watchers) {
       watcher.close();
     }
     this.watchers.clear();
@@ -182,7 +182,7 @@ export class DocumentIngester extends EventEmitter {
   /**
    * Extract principles from document content
    */
-  private async extractPrinciples(content: string, metadata: DocumentMetadata): Promise<ExtractedPrinciple[]> {
+  async extractPrinciples(content: string, metadata: DocumentMetadata): Promise<ExtractedPrinciple[]> {
     const principles: ExtractedPrinciple[] = [];
     const lines = content.split('\n');
 
@@ -249,7 +249,7 @@ export class DocumentIngester extends EventEmitter {
   /**
    * Extract concepts from document content
    */
-  private async extractConcepts(content: string, metadata: DocumentMetadata): Promise<string[]> {
+  private async extractConcepts(content: string, _metadata: DocumentMetadata): Promise<string[]> {
     const concepts: string[] = [];
     
     // Extract headings as concepts
@@ -277,7 +277,7 @@ export class DocumentIngester extends EventEmitter {
   /**
    * Extract relationships between concepts
    */
-  private async extractRelations(content: string, concepts: string[], metadata: DocumentMetadata): Promise<ConceptRelation[]> {
+  private async extractRelations(content: string, concepts: string[], _metadata: DocumentMetadata): Promise<ConceptRelation[]> {
     const relations: ConceptRelation[] = [];
     
     // Simple co-occurrence based relationship extraction

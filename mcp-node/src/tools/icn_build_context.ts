@@ -300,7 +300,7 @@ function levenshteinDistance(str1: string, str2: string): number {
  * Extract relevant excerpt from document content
  */
 function extractRelevantExcerpt(content: string, query: string, maxLength: number = 200): string {
-  const queryTerms = extractKeyTerms(query);
+  // Note: extractKeyTerms(query) reserved for future weighting logic
   const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
   
   let bestSentence = '';
@@ -324,7 +324,7 @@ function extractRelevantExcerpt(content: string, query: string, maxLength: numbe
 /**
  * Generate warnings based on the context and query
  */
-async function generateWarnings(query: string, guidance: ContextualGuidance, kg: KnowledgeGraph): Promise<ContextualGuidance['warnings']> {
+async function generateWarnings(query: string, guidance: ContextualGuidance, _kg: KnowledgeGraph): Promise<ContextualGuidance['warnings']> {
   const warnings: ContextualGuidance['warnings'] = [];
   
   // Check for conflicting principles

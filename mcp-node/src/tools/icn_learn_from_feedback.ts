@@ -288,7 +288,7 @@ async function processCorrectionFeedback(request: FeedbackRequest, learning: Lea
 /**
  * Process improvement feedback to enhance knowledge
  */
-async function processImprovementFeedback(request: FeedbackRequest, learning: LearningUpdate, kg: KnowledgeGraph): Promise<void> {
+async function processImprovementFeedback(request: FeedbackRequest, learning: LearningUpdate, _kg: KnowledgeGraph): Promise<void> {
   if (request.feedback.suggestions) {
     for (const suggestion of request.feedback.suggestions) {
       const patterns = await extractPatternsFromSuggestion(suggestion);
@@ -303,7 +303,7 @@ async function processImprovementFeedback(request: FeedbackRequest, learning: Le
 async function processCorrection(
   correction: NonNullable<FeedbackRequest['feedback']['corrections']>[0],
   learning: LearningUpdate,
-  kg: KnowledgeGraph
+  _kg: KnowledgeGraph
 ): Promise<void> {
   // Note: In a real implementation, we would update the actual principle/concept
   // For now, we'll just record the correction intent
@@ -330,7 +330,7 @@ async function processCorrection(
 /**
  * Identify success patterns from what worked
  */
-async function identifySuccessPatterns(whatWorked: string[], kg: KnowledgeGraph): Promise<LearningUpdate['newPatterns']> {
+async function identifySuccessPatterns(whatWorked: string[], _kg: KnowledgeGraph): Promise<LearningUpdate['newPatterns']> {
   const patterns: LearningUpdate['newPatterns'] = [];
 
   for (const item of whatWorked) {
@@ -439,7 +439,7 @@ async function adjustConceptWeight(conceptName: string, newWeight: number, reaso
 async function generateLearningRecommendations(
   request: FeedbackRequest,
   learning: LearningUpdate,
-  kg: KnowledgeGraph
+  _kg: KnowledgeGraph
 ): Promise<string[]> {
   const recommendations: string[] = [];
 

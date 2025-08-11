@@ -155,7 +155,7 @@ export class Embeddings {
       .slice(0, maxTerms);
 
     const embedding = new Array(maxTerms).fill(0);
-    topTerms.forEach(([term, count], index) => {
+    topTerms.forEach(([_term, count], index) => {
       embedding[index] = count / tokens.length; // Normalized frequency
     });
 
