@@ -2,6 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { request } from 'undici';
 
+async function registerAgent(baseUrl: string): Promise<string> {
+  const res = await request(`${baseUrl}/agent/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ 
+      name: 'Planner A', 
+      kind: 'planner' 
+    })
+  });
+  const json = (await res.body.json()) as any;
+  if (!json?.token) {
+    throw new Error('Failed to register agent: no token received');
+  }
+  console.log('Planner registered successfully, agent ID:', json.id);
+  return json.token;
+}
+
 async function main() {
   const overviewPath = path.resolve(process.cwd(), 'docs/architecture/00-overview.md');
   let contents = '';
@@ -19,11 +36,18 @@ async function main() {
   }
 
   const baseUrl = process.env.MCP_BASE_URL || 'http://localhost:8787/api';
+  
+  // Register agent and get token
+  const token = await registerAgent(baseUrl);
+  
   const created: string[] = [];
   for (const t of tasks) {
     const res = await request(`${baseUrl}/task/create`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 
+        'content-type': 'application/json',
+        'authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ title: t.title, created_by: 'planner' })
     });
     const json = (await res.body.json()) as any;

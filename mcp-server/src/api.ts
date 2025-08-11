@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { insertTask, listTasks, insertDep, insertAgent, countAgents } from './db.js';
+import { insertTask, listTasks, insertDep, insertAgent, countAgents, refreshAgentToken, cleanupExpiredTokens } from './db.js';
 import { checkPolicy, initPolicyWatcher } from './policy.js';
 import { createPr } from './github.js';
 import { requireAuth } from './auth.js';
@@ -45,6 +45,28 @@ export async function apiRoutes(f: FastifyInstance) {
     agentsTotal.set(countAgents());
     req.log.info({ reqId: req.id, agentId: id, agentName: body.name, agentKind: body.kind }, 'agent registered');
     return reply.code(200).send({ ok: true, id, token });
+  });
+
+  f.post('/agent/refresh', { preHandler: requireAuth() }, async (req, reply) => {
+    if (!req.agent?.id) {
+      return reply.code(401).send({ ok: false, error: 'unauthorized' });
+    }
+    
+    // Clean up expired tokens first
+    const expired = cleanupExpiredTokens();
+    if (expired > 0) {
+      req.log.info({ expiredCount: expired }, 'cleaned up expired tokens');
+    }
+    
+    const newToken = crypto.randomBytes(32).toString('hex');
+    const refreshed = refreshAgentToken(req.agent.id, newToken);
+    
+    if (!refreshed) {
+      return reply.code(404).send({ ok: false, error: 'agent not found' });
+    }
+    
+    req.log.info({ reqId: req.id, agentId: req.agent.id }, 'token refreshed');
+    return reply.send({ ok: true, token: newToken });
   });
 
   f.post('/task/create', { preHandler: requireAuth() }, async (req, reply) => {

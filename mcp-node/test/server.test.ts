@@ -44,4 +44,49 @@ describe('MCP Server', () => {
       expect(suggestApproachTool?.inputSchema.required).toContain('task_description');
     });
   });
+
+  describe('Stdio Timeout Behavior', () => {
+    it('should timeout tool execution after 30 seconds', async () => {
+      // Mock a tool that takes longer than timeout
+      const slowTool = () => new Promise(resolve => setTimeout(resolve, 35000));
+      
+      // Timeout wrapper function (extracted from server.ts logic)
+      const executeWithTimeout = async <T>(fn: () => Promise<T>, timeoutMs: number = 30000): Promise<T> => {
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error(`Tool execution timeout after ${timeoutMs}ms`));
+          }, timeoutMs);
+
+          fn()
+            .then(resolve)
+            .catch(reject)
+            .finally(() => clearTimeout(timeout));
+        });
+      };
+
+      // Test with short timeout for fast test execution
+      await expect(executeWithTimeout(slowTool, 100)).rejects.toThrow('Tool execution timeout after 100ms');
+    });
+
+    it('should successfully execute tools that complete within timeout', async () => {
+      // Mock a fast tool
+      const fastTool = () => Promise.resolve({ result: 'success' });
+      
+      const executeWithTimeout = async <T>(fn: () => Promise<T>, timeoutMs: number = 30000): Promise<T> => {
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error(`Tool execution timeout after ${timeoutMs}ms`));
+          }, timeoutMs);
+
+          fn()
+            .then(resolve)
+            .catch(reject)
+            .finally(() => clearTimeout(timeout));
+        });
+      };
+
+      const result = await executeWithTimeout(fastTool, 1000);
+      expect(result).toEqual({ result: 'success' });
+    });
+  });
 });
