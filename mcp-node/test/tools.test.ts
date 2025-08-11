@@ -5,6 +5,9 @@ import { icnCheckPolicy } from '../src/tools/icn_check_policy.js';
 import { icnGetTaskContext } from '../src/tools/icn_get_task_context.js';
 import { icnGetSimilarPrs } from '../src/tools/icn_get_similar_prs.js';
 import { icnSuggestApproach } from '../src/tools/icn_suggest_approach.js';
+import { icnExtractPrinciples } from '../src/tools/icn_extract_principles.js';
+import { icnBuildContext } from '../src/tools/icn_build_context.js';
+import { icnLearnFromFeedback } from '../src/tools/icn_learn_from_feedback.js';
 import { 
   icnStartWorkflow, 
   icnGetNextStep, 
@@ -326,6 +329,164 @@ describe('ICN Tools', () => {
       it('should throw error for non-existent workflow', async () => {
         await expect(icnGetWorkflowState({ workflowId: 'non-existent-workflow' }))
           .rejects.toThrow(/not found/);
+      });
+    });
+  });
+
+  describe('Knowledge System Tools', () => {
+    describe('icnExtractPrinciples', () => {
+      it('should extract principles from content', async () => {
+        const result = await icnExtractPrinciples({
+          content: 'The system MUST validate all inputs. The network SHOULD use encryption.'
+        });
+        
+        expect(result).toHaveProperty('principles');
+        expect(result).toHaveProperty('summary');
+        expect(Array.isArray(result.principles)).toBe(true);
+        expect(result.summary).toHaveProperty('totalFound');
+        expect(result.summary).toHaveProperty('byType');
+        expect(result.summary).toHaveProperty('avgConfidence');
+      });
+
+      it('should work without content (search existing)', async () => {
+        const result = await icnExtractPrinciples({});
+        
+        expect(result).toHaveProperty('principles');
+        expect(result).toHaveProperty('summary');
+        expect(Array.isArray(result.principles)).toBe(true);
+      });
+
+      it('should filter by types', async () => {
+        const result = await icnExtractPrinciples({
+          content: 'The system MUST validate. The network SHOULD encrypt.',
+          types: ['MUST']
+        });
+        
+        expect(result.principles.every(p => p.type === 'MUST')).toBe(true);
+      });
+    });
+
+    describe('icnBuildContext', () => {
+      it('should build context for queries', async () => {
+        const result = await icnBuildContext({
+          query: 'How to implement voting mechanisms?'
+        });
+        
+        expect(result).toHaveProperty('query');
+        expect(result).toHaveProperty('guidance');
+        expect(result).toHaveProperty('metadata');
+        expect(result.guidance).toHaveProperty('relevantPrinciples');
+        expect(result.guidance).toHaveProperty('relatedConcepts');
+        expect(result.guidance).toHaveProperty('recommendations');
+        expect(result.metadata).toHaveProperty('searchTime');
+        expect(result.metadata).toHaveProperty('confidenceScore');
+      });
+
+      it('should respect maxResults parameter', async () => {
+        const result = await icnBuildContext({
+          query: 'governance',
+          maxResults: 3
+        });
+        
+        expect(result.guidance.relevantPrinciples.length).toBeLessThanOrEqual(3);
+        expect(result.guidance.relatedConcepts.length).toBeLessThanOrEqual(3);
+      });
+
+      it('should include warnings when requested', async () => {
+        const result = await icnBuildContext({
+          query: 'completely unknown topic xyz123',
+          includeWarnings: true
+        });
+        
+        expect(Array.isArray(result.guidance.warnings)).toBe(true);
+      });
+    });
+
+    describe('icnLearnFromFeedback', () => {
+      it('should process success feedback', async () => {
+        const result = await icnLearnFromFeedback({
+          type: 'success',
+          context: {
+            query: 'test implementation'
+          },
+          feedback: {
+            whatWorked: ['Democratic approach', 'Consensus mechanism']
+          },
+          metadata: {
+            source: 'test'
+          }
+        });
+        
+        expect(result).toHaveProperty('feedbackId');
+        expect(result).toHaveProperty('processed');
+        expect(result).toHaveProperty('learning');
+        expect(result).toHaveProperty('recommendations');
+        expect(result).toHaveProperty('status');
+        expect(result.status).toBe('success');
+        expect(Array.isArray(result.recommendations)).toBe(true);
+      });
+
+      it('should process failure feedback', async () => {
+        const result = await icnLearnFromFeedback({
+          type: 'failure',
+          context: {
+            query: 'failed implementation'
+          },
+          feedback: {
+            whatFailed: ['Centralized approach']
+          },
+          metadata: {
+            source: 'test'
+          }
+        });
+        
+        expect(result.status).toBe('success');
+        expect(result.learning).toHaveProperty('principleUpdates');
+        expect(result.learning).toHaveProperty('conceptUpdates');
+      });
+
+      it('should process corrections', async () => {
+        const result = await icnLearnFromFeedback({
+          type: 'correction',
+          context: {
+            principleIds: ['test-principle']
+          },
+          feedback: {
+            corrections: [{
+              originalValue: 'old value',
+              correctedValue: 'new value',
+              reason: 'test correction'
+            }]
+          },
+          metadata: {
+            source: 'test'
+          }
+        });
+        
+        expect(result.status).toBe('success');
+        expect(result.processed.principles).toBeGreaterThanOrEqual(0);
+      });
+
+      it('should handle confidence adjustments', async () => {
+        const result = await icnLearnFromFeedback({
+          type: 'improvement',
+          context: {
+            conceptNames: ['test-concept']
+          },
+          feedback: {
+            confidenceAdjustment: [{
+              conceptName: 'test-concept',
+              newConfidence: 0.8,
+              reason: 'proven effective'
+            }]
+          },
+          metadata: {
+            source: 'test'
+          }
+        });
+        
+        expect(result.status).toBe('success');
+        expect(result.learning.conceptUpdates.length).toBeGreaterThan(0);
       });
     });
   });

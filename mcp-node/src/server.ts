@@ -21,6 +21,9 @@ import {
   icnListWorkflowTemplates,
   icnGetWorkflowState
 } from './tools/icn_workflow.js';
+import { icnExtractPrinciples } from './tools/icn_extract_principles.js';
+import { icnBuildContext } from './tools/icn_build_context.js';
+import { icnLearnFromFeedback } from './tools/icn_learn_from_feedback.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -256,6 +259,84 @@ class ICNMCPServer {
             }
             const result = await executeWithTimeout(() => icnGetWorkflowState({
               workflowId: args.workflowId as string
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_extract_principles': {
+            const content = typeof args?.content === 'string' ? args.content : undefined;
+            const filePath = typeof args?.filePath === 'string' ? args.filePath : undefined;
+            const types = Array.isArray(args?.types) ? args.types : undefined;
+            const minConfidence = typeof args?.minConfidence === 'number' ? args.minConfidence : undefined;
+            
+            const result = await executeWithTimeout(() => icnExtractPrinciples({
+              content,
+              filePath,
+              types,
+              minConfidence
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_build_context': {
+            if (!args?.query || typeof args.query !== 'string') {
+              throw new Error('query parameter is required and must be a string');
+            }
+            const maxResults = typeof args.maxResults === 'number' ? args.maxResults : undefined;
+            const includeExamples = typeof args.includeExamples === 'boolean' ? args.includeExamples : undefined;
+            const includeWarnings = typeof args.includeWarnings === 'boolean' ? args.includeWarnings : undefined;
+            const focusAreas = Array.isArray(args.focusAreas) ? args.focusAreas : undefined;
+            
+            const result = await executeWithTimeout(() => icnBuildContext({
+              query: args.query as string,
+              maxResults,
+              includeExamples,
+              includeWarnings,
+              focusAreas
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_learn_from_feedback': {
+            if (!args?.type || typeof args.type !== 'string') {
+              throw new Error('type parameter is required and must be a string');
+            }
+            if (!args?.context || typeof args.context !== 'object') {
+              throw new Error('context parameter is required and must be an object');
+            }
+            if (!args?.feedback || typeof args.feedback !== 'object') {
+              throw new Error('feedback parameter is required and must be an object');
+            }
+            
+            const metadata = typeof args.metadata === 'object' && args.metadata !== null && 'source' in args.metadata
+              ? args.metadata as any : { source: 'mcp-server' };
+            
+            const result = await executeWithTimeout(() => icnLearnFromFeedback({
+              type: args.type as any,
+              context: args.context as any,
+              feedback: args.feedback as any,
+              metadata
             }));
             return {
               content: [

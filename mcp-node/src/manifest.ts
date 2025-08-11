@@ -203,6 +203,170 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['workflowId']
       }
+    },
+    {
+      name: 'icn_extract_principles',
+      description: 'Parse documents for MUST/SHOULD/MAY requirements, invariants, formulas, and governance rules with confidence scores',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          content: {
+            type: 'string',
+            description: 'Document content to extract principles from (optional if using existing knowledge base)'
+          },
+          filePath: {
+            type: 'string',
+            description: 'File path for the content (optional, used for source attribution)'
+          },
+          types: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['MUST', 'SHOULD', 'MAY', 'invariant', 'formula', 'governance']
+            },
+            description: 'Types of principles to extract (optional, defaults to all types)'
+          },
+          minConfidence: {
+            type: 'number',
+            minimum: 0,
+            maximum: 1,
+            description: 'Minimum confidence score for returned principles (optional, defaults to 0)'
+          }
+        }
+      }
+    },
+    {
+      name: 'icn_build_context',
+      description: 'Build adaptive contextual guidance by searching knowledge graph for relevant concepts, principles, and examples',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Task description or question about ICN to get contextual guidance for'
+          },
+          maxResults: {
+            type: 'number',
+            minimum: 1,
+            maximum: 50,
+            description: 'Maximum number of results per category (optional, defaults to 10)'
+          },
+          includeExamples: {
+            type: 'boolean',
+            description: 'Whether to include examples from documents (optional, defaults to false)'
+          },
+          includeWarnings: {
+            type: 'boolean',
+            description: 'Whether to include warnings about conflicts or uncertainties (optional, defaults to false)'
+          },
+          focusAreas: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['principles', 'concepts', 'relations', 'examples']
+            },
+            description: 'Areas to focus on for context building (optional, defaults to all areas)'
+          }
+        },
+        required: ['query']
+      }
+    },
+    {
+      name: 'icn_learn_from_feedback',
+      description: 'Learn from feedback about what worked, what failed, and corrections to update knowledge graph weights and relationships',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['success', 'failure', 'correction', 'improvement'],
+            description: 'Type of feedback being provided'
+          },
+          context: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The original query or task description'
+              },
+              principleIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'IDs of principles that were involved'
+              },
+              conceptNames: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Names of concepts that were involved'
+              },
+              taskDescription: {
+                type: 'string',
+                description: 'Description of the task that was attempted'
+              }
+            },
+            description: 'Context about what the feedback relates to'
+          },
+          feedback: {
+            type: 'object',
+            properties: {
+              whatWorked: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'List of approaches or principles that worked well'
+              },
+              whatFailed: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'List of approaches or principles that failed'
+              },
+              corrections: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    principleId: { type: 'string' },
+                    conceptName: { type: 'string' },
+                    originalValue: { type: 'string' },
+                    correctedValue: { type: 'string' },
+                    reason: { type: 'string' }
+                  },
+                  required: ['originalValue', 'correctedValue', 'reason']
+                },
+                description: 'Specific corrections to principles or concepts'
+              },
+              suggestions: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Suggestions for improvement'
+              },
+              confidenceAdjustment: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    principleId: { type: 'string' },
+                    conceptName: { type: 'string' },
+                    newConfidence: { type: 'number', minimum: 0, maximum: 1 },
+                    reason: { type: 'string' }
+                  },
+                  required: ['newConfidence', 'reason']
+                },
+                description: 'Adjustments to confidence scores'
+              }
+            },
+            description: 'The feedback data'
+          },
+          metadata: {
+            type: 'object',
+            properties: {
+              source: { type: 'string' },
+              userId: { type: 'string' }
+            },
+            description: 'Optional metadata about the feedback source'
+          }
+        },
+        required: ['type', 'context', 'feedback']
+      }
     }
   ];
 }
