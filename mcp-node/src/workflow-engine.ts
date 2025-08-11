@@ -76,7 +76,7 @@ export interface WorkflowDatabase {
 // In-memory locks for concurrency control
 const workflowLocks = new Map<string, Promise<any>>();
 
-class WorkflowEngine {
+export class WorkflowEngine {
   private templates: Map<string, WorkflowTemplate & { hash: string }> = new Map();
   private db: WorkflowDatabase | null = null;
   private templatesLoaded = false;
