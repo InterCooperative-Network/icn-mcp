@@ -32,6 +32,10 @@ import { icnSimulateEconomy } from './tools/icn_simulate_economy.js';
 import { icnBuildFormula } from './tools/icn_build_formula.js';
 import { icnEconomicAdvice } from './tools/icn_economic_advice.js';
 import { icnOrchestleSettlement } from './tools/icn_orchestrate_settlement.js';
+import { icnBuildGovernanceFlow } from './tools/icn_build_governance_flow.js';
+import { icnAdviseVoting } from './tools/icn_advise_voting.js';
+import { icnManageSortition } from './tools/icn_manage_sortition.js';
+import { icnBuildPolicy } from './tools/icn_build_policy.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -535,6 +539,137 @@ class ICNMCPServer {
               organizations: args.organizations as any,
               exchangeRates: processedExchangeRates,
               preferences
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_build_governance_flow': {
+            if (!args?.decisionType || typeof args.decisionType !== 'string') {
+              throw new Error('decisionType parameter is required and must be a string');
+            }
+            if (!args?.scope || typeof args.scope !== 'string') {
+              throw new Error('scope parameter is required and must be a string');
+            }
+            const context = typeof args.context === 'string' ? args.context : undefined;
+            
+            const result = await executeWithTimeout(() => icnBuildGovernanceFlow({
+              decisionType: args.decisionType as any,
+              scope: args.scope as any,
+              context
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_advise_voting': {
+            if (!args?.scenario || typeof args.scenario !== 'object') {
+              throw new Error('scenario parameter is required and must be an object');
+            }
+            if (!args?.goals || typeof args.goals !== 'object') {
+              throw new Error('goals parameter is required and must be an object');
+            }
+            
+            const result = await executeWithTimeout(() => icnAdviseVoting(
+              args.scenario as any,
+              args.goals as any
+            ));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_manage_sortition': {
+            if (!args?.roleRequirements || typeof args.roleRequirements !== 'object') {
+              throw new Error('roleRequirements parameter is required and must be an object');
+            }
+            if (!args?.eligibleMembers || !Array.isArray(args.eligibleMembers)) {
+              throw new Error('eligibleMembers parameter is required and must be an array');
+            }
+            if (!args?.constraints || typeof args.constraints !== 'object') {
+              throw new Error('constraints parameter is required and must be an object');
+            }
+            if (!args?.parameters || typeof args.parameters !== 'object') {
+              throw new Error('parameters parameter is required and must be an object');
+            }
+            
+            // Convert date strings to Date objects for eligible members
+            const eligibleMembers = args.eligibleMembers.map((member: any) => ({
+              ...member,
+              info: {
+                ...member.info,
+                joinDate: new Date(member.info.joinDate)
+              },
+              participationHistory: {
+                ...member.participationHistory,
+                lastSelected: member.participationHistory.lastSelected ? 
+                  new Date(member.participationHistory.lastSelected) : undefined
+              },
+              availability: {
+                ...member.availability,
+                availableFrom: member.availability.availableFrom ?
+                  new Date(member.availability.availableFrom) : undefined,
+                availableUntil: member.availability.availableUntil ?
+                  new Date(member.availability.availableUntil) : undefined
+              }
+            }));
+            
+            const result = await executeWithTimeout(() => icnManageSortition({
+              roleRequirements: args.roleRequirements as any,
+              eligibleMembers,
+              constraints: args.constraints as any,
+              parameters: args.parameters as any
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_build_policy': {
+            if (!args?.description || typeof args.description !== 'string') {
+              throw new Error('description parameter is required and must be a string');
+            }
+            if (!args?.category || typeof args.category !== 'string') {
+              throw new Error('category parameter is required and must be a string');
+            }
+            if (!args?.scope || typeof args.scope !== 'object') {
+              throw new Error('scope parameter is required and must be an object');
+            }
+            if (!args?.stakeholders || typeof args.stakeholders !== 'object') {
+              throw new Error('stakeholders parameter is required and must be an object');
+            }
+            
+            const constraints = typeof args.constraints === 'object' && args.constraints !== null ? 
+              args.constraints : {};
+            
+            const result = await executeWithTimeout(() => icnBuildPolicy({
+              description: args.description as string,
+              category: args.category as any,
+              scope: args.scope as any,
+              stakeholders: args.stakeholders as any,
+              constraints
             }));
             return {
               content: [
