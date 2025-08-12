@@ -28,6 +28,10 @@ import { icnSynthesizeSpec } from './tools/icn_synthesize_spec.js';
 import { icnCheckInvariants } from './tools/icn_check_invariants.js';
 import { icnValidateImplementation } from './tools/icn_validate_implementation.js';
 import { icnGenerateTests } from './tools/icn_generate_tests.js';
+import { icnSimulateEconomy } from './tools/icn_simulate_economy.js';
+import { icnBuildFormula } from './tools/icn_build_formula.js';
+import { icnEconomicAdvice } from './tools/icn_economic_advice.js';
+import { icnOrchestleSettlement } from './tools/icn_orchestrate_settlement.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -428,6 +432,109 @@ class ICNMCPServer {
               surface,
               requirements,
               description
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_simulate_economy': {
+            if (!args?.parameters || typeof args.parameters !== 'object') {
+              throw new Error('parameters parameter is required and must be an object');
+            }
+            const participantBehaviors = Array.isArray(args.participantBehaviors) ? args.participantBehaviors : undefined;
+            
+            const result = await executeWithTimeout(() => icnSimulateEconomy({
+              parameters: args.parameters as any,
+              participantBehaviors
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_build_formula': {
+            if (!args?.description || typeof args.description !== 'string') {
+              throw new Error('description parameter is required and must be a string');
+            }
+            const context = typeof args.context === 'string' ? args.context : undefined;
+            const outputType = typeof args.outputType === 'string' ? args.outputType as any : undefined;
+            const knownVariables = Array.isArray(args.knownVariables) ? args.knownVariables : undefined;
+            
+            const result = await executeWithTimeout(() => icnBuildFormula({
+              description: args.description as string,
+              context,
+              outputType,
+              knownVariables
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_economic_advice': {
+            if (!args?.mechanism || typeof args.mechanism !== 'object') {
+              throw new Error('mechanism parameter is required and must be an object');
+            }
+            const context = typeof args.context === 'object' && args.context !== null ? args.context : undefined;
+            const concerns = Array.isArray(args.concerns) ? args.concerns : undefined;
+            
+            const result = await executeWithTimeout(() => icnEconomicAdvice({
+              mechanism: args.mechanism as any,
+              context,
+              concerns
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_orchestrate_settlement': {
+            if (!args?.transactions || !Array.isArray(args.transactions)) {
+              throw new Error('transactions parameter is required and must be an array');
+            }
+            if (!args?.organizations || !Array.isArray(args.organizations)) {
+              throw new Error('organizations parameter is required and must be an array');
+            }
+            const exchangeRates = Array.isArray(args.exchangeRates) ? args.exchangeRates : undefined;
+            const preferences = typeof args.preferences === 'object' && args.preferences !== null ? args.preferences : undefined;
+            
+            // Convert timestamp strings to Date objects
+            const transactions = args.transactions.map((tx: any) => ({
+              ...tx,
+              timestamp: new Date(tx.timestamp)
+            }));
+            
+            const processedExchangeRates = exchangeRates?.map((rate: any) => ({
+              ...rate,
+              timestamp: new Date(rate.timestamp)
+            }));
+            
+            const result = await executeWithTimeout(() => icnOrchestleSettlement({
+              transactions,
+              organizations: args.organizations as any,
+              exchangeRates: processedExchangeRates,
+              preferences
             }));
             return {
               content: [

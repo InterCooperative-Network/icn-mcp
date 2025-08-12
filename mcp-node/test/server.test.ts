@@ -7,7 +7,7 @@ describe('MCP Server', () => {
       const manifest = generateToolManifest();
       
       expect(Array.isArray(manifest)).toBe(true);
-      expect(manifest.length).toBe(18);
+      expect(manifest.length).toBe(22);
       
       const toolNames = manifest.map(tool => tool.name);
       expect(toolNames).toContain('icn_get_architecture');
