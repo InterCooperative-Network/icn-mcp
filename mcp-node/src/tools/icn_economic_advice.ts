@@ -173,23 +173,23 @@ function analyzeImpacts(mechanism: EconomicMechanism, context: Record<string, an
 
 function analyzeWealthDistributionImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
-  const currentGini = context.currentGini || 0.3;
+  const currentGini = context.currentGini ?? 0.3;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
   let magnitude = 0.1;
   let explanation = 'Minimal impact on wealth distribution';
   
-  // Analyze based on mechanism type
+  // Analyze based on mechanism type and current inequality level
   if (name.toLowerCase().includes('levy') || name.toLowerCase().includes('tax')) {
     const rate = extractNumericParameter(parameters, ['rate', 'levy_rate', 'tax_rate']);
     if (rate > 0.2) {
       direction = 'positive';
-      magnitude = Math.min(0.8, rate * 2);
-      explanation = `Progressive levy of ${(rate * 100).toFixed(1)}% should reduce wealth concentration`;
+      magnitude = Math.min(0.8, rate * 2 * (1 + currentGini)); // Higher impact with higher inequality
+      explanation = `Progressive levy of ${(rate * 100).toFixed(1)}% should reduce wealth concentration (current Gini: ${currentGini.toFixed(2)})`;
     } else if (rate > 0) {
       direction = 'positive';
-      magnitude = 0.3;
-      explanation = `Moderate levy rate may provide minor improvement in distribution`;
+      magnitude = 0.3 * (1 + currentGini); // Scale with current inequality
+      explanation = `Moderate levy rate may provide minor improvement in distribution (current Gini: ${currentGini.toFixed(2)})`;
     }
   } else if (name.toLowerCase().includes('demurrage')) {
     const rate = extractNumericParameter(parameters, ['demurrage_rate', 'rate']);
@@ -227,7 +227,7 @@ function analyzeWealthDistributionImpact(mechanism: EconomicMechanism, context: 
 
 function analyzeParticipationImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
-  const networkSize = context.networkSize || 100; const tokenVelocity = context.tokenVelocity || 0.5; const currentGini = context.networkSize || 100;
+  const currentGini = context.currentGini ?? 0.3;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
   let magnitude = 0.1;
@@ -238,13 +238,16 @@ function analyzeParticipationImpact(mechanism: EconomicMechanism, context: Recor
     const averageWealth = context.averageWealth || 1000;
     const relativeBarrier = amount / averageWealth;
     
+    // Higher inequality means barriers have more excluding effect
+    const inequalityMultiplier = 1 + currentGini;
+    
     if (relativeBarrier > 0.1) {
       direction = 'negative';
-      magnitude = Math.min(0.9, relativeBarrier * 5);
-      explanation = `High participation barrier (${(relativeBarrier * 100).toFixed(1)}% of average wealth) may exclude participants`;
+      magnitude = Math.min(0.9, relativeBarrier * 5 * inequalityMultiplier);
+      explanation = `High participation barrier (${(relativeBarrier * 100).toFixed(1)}% of average wealth) may exclude participants (inequality factor: ${currentGini.toFixed(2)})`;
     } else if (relativeBarrier > 0.05) {
       direction = 'negative';
-      magnitude = 0.4;
+      magnitude = 0.4 * inequalityMultiplier;
       explanation = 'Moderate participation barrier may limit some participants';
     }
   } else if (name.toLowerCase().includes('reward') || name.toLowerCase().includes('incentive')) {
@@ -271,7 +274,7 @@ function analyzeParticipationImpact(mechanism: EconomicMechanism, context: Recor
 
 function analyzeVelocityImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
-  const networkSize = context.networkSize || 100; const tokenVelocity = context.tokenVelocity || 0.5; const currentGini = context.tokenVelocity || 0.5;
+  const currentGini = context.currentGini ?? 0.3;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
   let magnitude = 0.1;
@@ -281,8 +284,9 @@ function analyzeVelocityImpact(mechanism: EconomicMechanism, context: Record<str
     const rate = extractNumericParameter(parameters, ['demurrage_rate', 'rate']);
     if (rate > 0.001) {
       direction = 'positive';
-      magnitude = Math.min(0.8, rate * 200);
-      explanation = `Demurrage rate of ${(rate * 100).toFixed(3)}% should increase token circulation`;
+      // Higher inequality means demurrage has more positive effect on circulation
+      magnitude = Math.min(0.8, rate * 200 * (1 + currentGini));
+      explanation = `Demurrage rate of ${(rate * 100).toFixed(3)}% should increase token circulation (inequality factor: ${currentGini.toFixed(2)})`;
     }
   } else if (name.toLowerCase().includes('saving') || name.toLowerCase().includes('storage')) {
     const incentive = extractNumericParameter(parameters, ['interest', 'reward', 'rate']);
@@ -309,7 +313,7 @@ function analyzeVelocityImpact(mechanism: EconomicMechanism, context: Record<str
   };
 }
 
-function analyzeStabilityImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
+function analyzeStabilityImpact(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
@@ -347,8 +351,8 @@ function analyzeStabilityImpact(mechanism: EconomicMechanism, context: Record<st
   };
 }
 
-function analyzeGovernanceImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
-  const { name, parameters, description } = mechanism;
+function analyzeGovernanceImpact(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis {
+  const { parameters, description } = mechanism;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
   let magnitude = 0.1;
@@ -424,9 +428,9 @@ function identifyWarnings(
   return warnings;
 }
 
-function identifyCaptureRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
+function identifyCaptureRisks(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
-  const { name, parameters, description } = mechanism;
+  const { parameters, description } = mechanism;
   
   // Check for centralized control
   const hasCentralizedControl = Object.keys(parameters).some(key => 
@@ -465,9 +469,9 @@ function identifyCaptureRisks(mechanism: EconomicMechanism, context: Record<stri
   return warnings;
 }
 
-function identifyHoardingRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
+function identifyHoardingRisks(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
-  const { name, parameters } = mechanism;
+  const { parameters } = mechanism;
   
   // Check for savings incentives without circulation incentives
   const hasInterest = extractNumericParameter(parameters, ['interest', 'yield', 'return']) > 0;
@@ -506,8 +510,8 @@ function identifyHoardingRisks(mechanism: EconomicMechanism, context: Record<str
 
 function identifyInequalityRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
-  const { name, parameters } = mechanism;
-  const networkSize = context.networkSize || 100; const tokenVelocity = context.tokenVelocity || 0.5; const currentGini = context.currentGini || 0.3;
+  const { parameters } = mechanism;
+  const currentGini = context.currentGini ?? 0.3;
   
   // Check for regressive mechanisms
   const hasFixedCosts = Object.keys(parameters).some(key => 
@@ -518,11 +522,15 @@ function identifyInequalityRisks(mechanism: EconomicMechanism, context: Record<s
     const cost = extractNumericParameter(parameters, ['fee', 'cost', 'minimum']);
     const averageWealth = context.averageWealth || 1000;
     
-    if (cost / averageWealth > 0.05) {
+    // Higher inequality makes fixed costs more regressive
+    const inequalityThreshold = 0.05 * (1 - currentGini * 0.5); // Lower threshold for high inequality
+    
+    if (cost / averageWealth > inequalityThreshold) {
+      const severity = currentGini > 0.4 ? 'high' : 'medium';
       warnings.push({
-        severity: 'high',
+        severity,
         type: 'inequality_increase',
-        message: 'Fixed costs represent high percentage of average wealth, creating regressive effects',
+        message: `Fixed costs represent high percentage of average wealth, creating regressive effects (current Gini: ${currentGini.toFixed(2)})`,
         recommendations: [
           'Implement progressive fee structures',
           'Add wealth-based fee adjustments',
@@ -593,7 +601,7 @@ function identifyParticipationBarriers(mechanism: EconomicMechanism, context: Re
   return warnings;
 }
 
-function identifyInstabilityRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
+function identifyInstabilityRisks(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
   const { parameters } = mechanism;
   
@@ -705,7 +713,7 @@ function generateParameterSuggestion(
   currentValue: number,
   impacts: ImpactAnalysis[],
   warnings: EconomicWarning[],
-  context: Record<string, any>
+  _context: Record<string, any>
 ): ParameterSuggestion | null {
   const paramLower = paramName.toLowerCase();
   
@@ -824,9 +832,9 @@ function findHistoricalCases(mechanism: EconomicMechanism): HistoricalCase[] {
 
 function analyzeICNConsiderations(
   mechanism: EconomicMechanism,
-  context: Record<string, any>
+  _context: Record<string, any>
 ): EconomicAdviceResponse['icnConsiderations'] {
-  const { name, description, parameters } = mechanism;
+  const { description, parameters } = mechanism;
   
   // Check alignment with ICN invariants
   const invariantAlignment = [

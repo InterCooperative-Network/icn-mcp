@@ -561,7 +561,7 @@ function consolidateSmallAmounts(events: SettlementEvent[]): SettlementEvent[] {
   }
   
   // Consolidate groups that meet minimum threshold
-  for (const [key, groupEvents] of groups) {
+  for (const [, groupEvents] of groups) {
     const totalAmount = groupEvents.reduce((sum, e) => sum + e.amount, 0);
     
     if (totalAmount >= minAmount) {
@@ -619,7 +619,6 @@ function detectDisputes(
   // Check for unauthorized settlements (low trust organizations)
   for (const event of settlementEvents) {
     const fromOrg = organizations.find(org => org.id === event.from);
-    const _ = organizations.find(org => org.id === event.to);
     
     if (fromOrg && fromOrg.trustScore < 0.3) {
       disputes.push({
@@ -675,7 +674,7 @@ function calculateOptimization(
 
 function generateSettlementSummary(
   settlementEvents: SettlementEvent[],
-  organizations: Organization[]
+  _organizations: Organization[]
 ): OrchestrationResponse['summary'] {
   const totalAmounts: Record<string, number> = {};
   let estimatedCost = 0;
