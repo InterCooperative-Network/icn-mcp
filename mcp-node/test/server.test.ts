@@ -7,7 +7,7 @@ describe('MCP Server', () => {
       const manifest = generateToolManifest();
       
       expect(Array.isArray(manifest)).toBe(true);
-      expect(manifest.length).toBe(22);
+      expect(manifest.length).toBe(26);
       
       const toolNames = manifest.map(tool => tool.name);
       expect(toolNames).toContain('icn_get_architecture');
@@ -21,6 +21,10 @@ describe('MCP Server', () => {
       expect(toolNames).toContain('icn_checkpoint');
       expect(toolNames).toContain('icn_list_workflow_templates');
       expect(toolNames).toContain('icn_get_workflow_state');
+      expect(toolNames).toContain('icn_build_governance_flow');
+      expect(toolNames).toContain('icn_advise_voting');
+      expect(toolNames).toContain('icn_manage_sortition');
+      expect(toolNames).toContain('icn_build_policy');
       
       // Check tool structure
       for (const tool of manifest) {

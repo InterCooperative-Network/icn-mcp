@@ -715,6 +715,273 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['transactions', 'organizations']
       }
+    },
+    {
+      name: 'icn_build_governance_flow',
+      description: 'Build complete governance flow from proposal to execution with democratic processes, voting mechanisms, and enforcement',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          decisionType: {
+            type: 'string',
+            enum: ['constitutional', 'budget', 'policy', 'operational', 'emergency'],
+            description: 'Type of decision being made'
+          },
+          scope: {
+            type: 'string',
+            enum: ['local', 'regional', 'global', 'federation'],
+            description: 'Scope of the decision'
+          },
+          context: {
+            type: 'string',
+            description: 'Optional context about the specific decision'
+          }
+        },
+        required: ['decisionType', 'scope']
+      }
+    },
+    {
+      name: 'icn_advise_voting',
+      description: 'Analyze governance scenarios and recommend optimal voting mechanisms with trade-off analysis and manipulation warnings',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          scenario: {
+            type: 'object',
+            properties: {
+              description: { type: 'string' },
+              participantCount: { type: 'number', minimum: 1 },
+              context: {
+                type: 'object',
+                properties: {
+                  decisionType: {
+                    type: 'string',
+                    enum: ['election', 'allocation', 'policy', 'constitutional', 'emergency']
+                  },
+                  scope: {
+                    type: 'string',
+                    enum: ['local', 'regional', 'federation', 'global']
+                  },
+                  urgency: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high', 'critical']
+                  }
+                },
+                required: ['decisionType', 'scope', 'urgency']
+              },
+              participants: {
+                type: 'object',
+                properties: {
+                  expertiseLevels: {
+                    type: 'string',
+                    enum: ['uniform', 'varied', 'highly_specialized']
+                  },
+                  stakeDistribution: {
+                    type: 'string',
+                    enum: ['equal', 'proportional', 'weighted', 'highly_unequal']
+                  },
+                  trustNetwork: {
+                    type: 'string',
+                    enum: ['high_trust', 'moderate_trust', 'low_trust', 'fragmented']
+                  }
+                },
+                required: ['expertiseLevels', 'stakeDistribution', 'trustNetwork']
+              },
+              constraints: {
+                type: 'object',
+                properties: {
+                  timeLimit: { type: 'number' },
+                  legitimacyRequirements: {
+                    type: 'array',
+                    items: { type: 'string' }
+                  },
+                  fairnessCriteria: {
+                    type: 'array',
+                    items: { type: 'string' }
+                  },
+                  resourceLimits: {
+                    type: 'array',
+                    items: { type: 'string' }
+                  }
+                },
+                required: ['legitimacyRequirements', 'fairnessCriteria']
+              }
+            },
+            required: ['description', 'participantCount', 'context', 'participants', 'constraints']
+          },
+          goals: {
+            type: 'object',
+            properties: {
+              objectives: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  enum: ['legitimacy', 'efficiency', 'fairness', 'expertise', 'participation', 'transparency']
+                }
+              },
+              weights: {
+                type: 'object',
+                additionalProperties: { type: 'number', minimum: 0, maximum: 1 }
+              },
+              successCriteria: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['objectives', 'weights', 'successCriteria']
+          }
+        },
+        required: ['scenario', 'goals']
+      }
+    },
+    {
+      name: 'icn_manage_sortition',
+      description: 'Manage fair random selection with constraints for sortition processes, including weighted selection and diversity requirements',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          roleRequirements: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              description: { type: 'string' },
+              requiredSkills: {
+                type: 'array',
+                items: { type: 'string' }
+              },
+              preferredExperience: {
+                type: 'array',
+                items: { type: 'string' }
+              },
+              timeCommitment: {
+                type: 'object',
+                properties: {
+                  duration: { type: 'number' },
+                  hoursPerWeek: { type: 'number' }
+                },
+                required: ['duration', 'hoursPerWeek']
+              }
+            },
+            required: ['title', 'description', 'requiredSkills', 'timeCommitment']
+          },
+          eligibleMembers: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                info: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    organization: { type: 'string' },
+                    location: { type: 'string' },
+                    joinDate: { type: 'string', format: 'date' }
+                  },
+                  required: ['name', 'joinDate']
+                },
+                participationHistory: {
+                  type: 'object',
+                  properties: {
+                    previousSelections: { type: 'number' },
+                    participationRate: { type: 'number', minimum: 0, maximum: 1 },
+                    performanceScores: {
+                      type: 'array',
+                      items: { type: 'number', minimum: 0, maximum: 1 }
+                    }
+                  },
+                  required: ['previousSelections', 'participationRate', 'performanceScores']
+                },
+                qualifications: {
+                  type: 'object',
+                  properties: {
+                    skills: {
+                      type: 'array',
+                      items: { type: 'string' }
+                    }
+                  },
+                  required: ['skills']
+                },
+                availability: {
+                  type: 'object',
+                  properties: {
+                    available: { type: 'boolean' },
+                    currentCommitments: { type: 'number' }
+                  },
+                  required: ['available', 'currentCommitments']
+                },
+                reputation: {
+                  type: 'object',
+                  properties: {
+                    trustScore: { type: 'number', minimum: 0, maximum: 1 }
+                  },
+                  required: ['trustScore']
+                }
+              },
+              required: ['id', 'info', 'participationHistory', 'qualifications', 'availability', 'reputation']
+            }
+          },
+          constraints: {
+            type: 'object',
+            properties: {
+              positions: { type: 'number', minimum: 1 }
+            },
+            required: ['positions']
+          },
+          parameters: {
+            type: 'object',
+            properties: {
+              cryptographicRandom: { type: 'boolean' },
+              allowReplacements: { type: 'boolean' }
+            },
+            required: ['cryptographicRandom', 'allowReplacements']
+          }
+        },
+        required: ['roleRequirements', 'eligibleMembers', 'constraints', 'parameters']
+      }
+    },
+    {
+      name: 'icn_build_policy',
+      description: 'Build structured policy objects with validation, conflict detection, and compliance tracking',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            description: 'High-level policy description'
+          },
+          category: {
+            type: 'string',
+            enum: ['governance', 'economic', 'technical', 'social', 'operational'],
+            description: 'Policy category'
+          },
+          scope: {
+            type: 'object',
+            properties: {
+              geographic: {
+                type: 'string',
+                enum: ['local', 'regional', 'federation', 'global']
+              },
+              organizational: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['geographic', 'organizational']
+          },
+          stakeholders: {
+            type: 'object',
+            properties: {
+              primary: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['primary']
+          }
+        },
+        required: ['description', 'category', 'scope', 'stakeholders']
+      }
     }
   ];
 }
