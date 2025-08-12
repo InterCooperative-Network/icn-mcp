@@ -451,6 +451,270 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['component']
       }
+    },
+    {
+      name: 'icn_simulate_economy',
+      description: 'Simulate ICN dual economy with CC generation, token flows, federation levies, and demurrage effects',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          parameters: {
+            type: 'object',
+            properties: {
+              steps: {
+                type: 'number',
+                description: 'Number of simulation steps',
+                minimum: 1,
+                maximum: 1000
+              },
+              nodeCount: {
+                type: 'number', 
+                description: 'Number of nodes/participants',
+                minimum: 1,
+                maximum: 1000
+              },
+              ccGenerationRate: {
+                type: 'number',
+                description: 'CC generation rate per node per step',
+                minimum: 0
+              },
+              initialTokens: {
+                type: 'number',
+                description: 'Initial token distribution per participant',
+                minimum: 0
+              },
+              demurrageRate: {
+                type: 'number',
+                description: 'Demurrage rate per step (decay factor for idle tokens)',
+                minimum: 0,
+                maximum: 1
+              },
+              federationLevyRate: {
+                type: 'number',
+                description: 'Federation levy rate on cooperative surplus',
+                minimum: 0,
+                maximum: 1
+              },
+              settlementFrequency: {
+                type: 'number',
+                description: 'Settlement frequency (every N steps)',
+                minimum: 1
+              },
+              trustWeights: {
+                type: 'array',
+                items: { type: 'number', minimum: 0, maximum: 1 },
+                description: 'Trust weight distribution (affects CC earning)'
+              }
+            },
+            required: ['steps', 'nodeCount', 'ccGenerationRate', 'initialTokens', 'demurrageRate', 'federationLevyRate', 'settlementFrequency']
+          },
+          participantBehaviors: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                infrastructureContribution: { type: 'number', minimum: 0, maximum: 1 },
+                activityLevel: { type: 'number', minimum: 0, maximum: 1 },
+                tokenVelocity: { type: 'number', minimum: 0, maximum: 1 },
+                trustScore: { type: 'number', minimum: 0, maximum: 1 }
+              },
+              required: ['id', 'infrastructureContribution', 'activityLevel', 'tokenVelocity', 'trustScore']
+            },
+            description: 'Optional specific participant behaviors'
+          }
+        },
+        required: ['parameters']
+      }
+    },
+    {
+      name: 'icn_build_formula',
+      description: 'Build mathematical formulas for ICN economic relationships with explanations and constraints',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            description: 'Description of the economic relationship to formulate'
+          },
+          context: {
+            type: 'string',
+            description: 'Optional context about the relationship'
+          },
+          outputType: {
+            type: 'string',
+            enum: ['amount', 'rate', 'percentage', 'weight', 'boolean'],
+            description: 'Expected output type of the formula'
+          },
+          knownVariables: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                description: { type: 'string' },
+                type: { 
+                  type: 'string',
+                  enum: ['number', 'percentage', 'rate', 'weight', 'boolean']
+                },
+                range: {
+                  type: 'object',
+                  properties: {
+                    min: { type: 'number' },
+                    max: { type: 'number' }
+                  }
+                }
+              },
+              required: ['name', 'description', 'type']
+            },
+            description: 'Known variables or constraints'
+          }
+        },
+        required: ['description']
+      }
+    },
+    {
+      name: 'icn_economic_advice',
+      description: 'Analyze economic mechanisms and provide advice on wealth distribution, participation, and stability impacts',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          mechanism: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              description: { type: 'string' },
+              parameters: {
+                type: 'object',
+                additionalProperties: true,
+                description: 'Key parameters of the mechanism'
+              },
+              targetOutcomes: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Target outcomes of the mechanism'
+              }
+            },
+            required: ['name', 'description', 'parameters'],
+            description: 'Economic mechanism to analyze'
+          },
+          context: {
+            type: 'object',
+            properties: {
+              networkSize: { type: 'number' },
+              averageWealth: { type: 'number' },
+              currentGini: { type: 'number', minimum: 0, maximum: 1 },
+              tokenVelocity: { type: 'number', minimum: 0, maximum: 1 },
+              ccGenerationRate: { type: 'number' }
+            },
+            description: 'Current economic context'
+          },
+          concerns: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Specific concerns to address'
+          }
+        },
+        required: ['mechanism']
+      }
+    },
+    {
+      name: 'icn_orchestrate_settlement',
+      description: 'Orchestrate settlement of inter-organizational transactions with netting, dispute detection, and optimization',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          transactions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                from: { type: 'string' },
+                to: { type: 'string' },
+                amount: { type: 'number', minimum: 0 },
+                currency: { 
+                  type: 'string',
+                  enum: ['tokens', 'credits', 'cc']
+                },
+                timestamp: { type: 'string', format: 'date-time' },
+                type: {
+                  type: 'string',
+                  enum: ['trade', 'service', 'transfer', 'levy', 'fee']
+                },
+                settlementStatus: {
+                  type: 'string',
+                  enum: ['pending', 'included', 'settled', 'disputed']
+                },
+                metadata: {
+                  type: 'object',
+                  additionalProperties: true
+                }
+              },
+              required: ['id', 'from', 'to', 'amount', 'currency', 'timestamp', 'type', 'settlementStatus']
+            },
+            description: 'Transactions to settle'
+          },
+          organizations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                type: {
+                  type: 'string',
+                  enum: ['cooperative', 'federation', 'individual', 'collective']
+                },
+                trustScore: { type: 'number', minimum: 0, maximum: 1 },
+                preferences: {
+                  type: 'object',
+                  properties: {
+                    minSettlementAmount: { type: 'number' },
+                    preferredFrequency: { type: 'number' },
+                    maxExposure: { type: 'number' }
+                  },
+                  required: ['minSettlementAmount', 'preferredFrequency', 'maxExposure']
+                }
+              },
+              required: ['id', 'name', 'type', 'trustScore', 'preferences']
+            },
+            description: 'Participating organizations'
+          },
+          exchangeRates: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                from: { type: 'string' },
+                to: { type: 'string' },
+                rate: { type: 'number', minimum: 0 },
+                timestamp: { type: 'string', format: 'date-time' },
+                confidence: { type: 'number', minimum: 0, maximum: 1 }
+              },
+              required: ['from', 'to', 'rate', 'timestamp', 'confidence']
+            },
+            description: 'Exchange rates between currencies'
+          },
+          preferences: {
+            type: 'object',
+            properties: {
+              forceSettlement: { type: 'boolean' },
+              maxDelay: { type: 'number' },
+              nettingAlgorithm: {
+                type: 'string',
+                enum: ['simple', 'multilateral', 'optimized']
+              },
+              disputeResolution: {
+                type: 'string',
+                enum: ['automatic', 'manual', 'democratic']
+              }
+            },
+            description: 'Settlement preferences'
+          }
+        },
+        required: ['transactions', 'organizations']
+      }
     }
   ];
 }

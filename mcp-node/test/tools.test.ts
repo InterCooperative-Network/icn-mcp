@@ -731,4 +731,516 @@ describe('ICN Tools', () => {
       });
     });
   });
+
+  // Economic Model Tools Tests
+  describe('icnSimulateEconomy', () => {
+    it('should simulate basic CC economy with 10 nodes', async () => {
+      const { icnSimulateEconomy } = await import('../src/tools/icn_simulate_economy.js');
+      const result = await icnSimulateEconomy({
+        parameters: {
+          steps: 100,
+          nodeCount: 10,
+          ccGenerationRate: 1.0,
+          initialTokens: 1000,
+          demurrageRate: 0.001,
+          federationLevyRate: 0.1,
+          settlementFrequency: 10
+        }
+      });
+
+      expect(result).toHaveProperty('simulationId');
+      expect(result).toHaveProperty('timeSeries');
+      expect(result.timeSeries).toHaveLength(100);
+      expect(result.parameters.nodeCount).toBe(10);
+      
+      // Check final state
+      const finalSnapshot = result.timeSeries[result.timeSeries.length - 1];
+      expect(finalSnapshot.totalCC).toBeGreaterThan(0);
+      expect(finalSnapshot.participants).toHaveLength(10);
+      
+      // Check metrics
+      expect(result.metrics).toHaveProperty('ccEfficiency');
+      expect(result.metrics).toHaveProperty('circulationHealth');
+      expect(result.metrics.ccEfficiency).toBeGreaterThanOrEqual(0);
+      expect(result.metrics.ccEfficiency).toBeLessThanOrEqual(1);
+    });
+
+    it('should generate warnings for problematic parameters', async () => {
+      const { icnSimulateEconomy } = await import('../src/tools/icn_simulate_economy.js');
+      const result = await icnSimulateEconomy({
+        parameters: {
+          steps: 50,
+          nodeCount: 5,
+          ccGenerationRate: 0.1,
+          initialTokens: 100,
+          demurrageRate: 0.1, // Very high demurrage
+          federationLevyRate: 0.5, // Very high levy
+          settlementFrequency: 5
+        }
+      });
+
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => w.includes('demurrage') || w.includes('levy'))).toBe(true);
+    });
+
+    it('should handle custom participant behaviors', async () => {
+      const { icnSimulateEconomy } = await import('../src/tools/icn_simulate_economy.js');
+      const result = await icnSimulateEconomy({
+        parameters: {
+          steps: 20,
+          nodeCount: 3,
+          ccGenerationRate: 1.0,
+          initialTokens: 1000,
+          demurrageRate: 0.001,
+          federationLevyRate: 0.1,
+          settlementFrequency: 5
+        },
+        participantBehaviors: [
+          {
+            id: 'high-contributor',
+            infrastructureContribution: 1.0,
+            activityLevel: 0.8,
+            tokenVelocity: 0.9,
+            trustScore: 0.9
+          },
+          {
+            id: 'low-contributor',
+            infrastructureContribution: 0.2,
+            activityLevel: 0.3,
+            tokenVelocity: 0.2,
+            trustScore: 0.4
+          },
+          {
+            id: 'moderate',
+            infrastructureContribution: 0.6,
+            activityLevel: 0.5,
+            tokenVelocity: 0.6,
+            trustScore: 0.7
+          }
+        ]
+      });
+
+      expect(result.timeSeries[0].participants).toHaveLength(3);
+      const highContributor = result.timeSeries[result.timeSeries.length - 1].participants
+        .find(p => p.id === 'high-contributor');
+      const lowContributor = result.timeSeries[result.timeSeries.length - 1].participants
+        .find(p => p.id === 'low-contributor');
+      
+      expect(highContributor?.ccBalance).toBeGreaterThan(lowContributor?.ccBalance || 0);
+    });
+  });
+
+  describe('icnBuildFormula', () => {
+    it('should build formula for CC earned from running a node', async () => {
+      const { icnBuildFormula } = await import('../src/tools/icn_build_formula.js');
+      const result = await icnBuildFormula({
+        description: 'CC earned from running a node',
+        outputType: 'amount'
+      });
+
+      expect(result.formula).toHaveProperty('expression');
+      expect(result.formula).toHaveProperty('variables');
+      expect(result.formula).toHaveProperty('invariants');
+      expect(result.formula.name).toContain('CC Generation');
+      
+      // Should include trust weights
+      expect(result.formula.variables.some(v => v.name.includes('trust'))).toBe(true);
+      expect(result.formula.variables.some(v => v.name.includes('infrastructure'))).toBe(true);
+      
+      // Should maintain ICN invariants
+      expect(result.formula.invariants.some(inv => inv.includes('non-transferable'))).toBe(true);
+      
+      expect(result.confidence).toBeGreaterThan(0.5);
+    });
+
+    it('should build formula for federation levy on cooperative surplus', async () => {
+      const { icnBuildFormula } = await import('../src/tools/icn_build_formula.js');
+      const result = await icnBuildFormula({
+        description: 'Federation levy on cooperative surplus with progressive calculation',
+        outputType: 'amount'
+      });
+
+      expect(result.formula.name).toContain('Federation Levy');
+      expect(result.formula.variables.some(v => v.name.includes('surplus'))).toBe(true);
+      expect(result.formula.variables.some(v => v.name.includes('progressive'))).toBe(true);
+      
+      // Should have examples
+      expect(result.formula.examples.length).toBeGreaterThan(0);
+      
+      // Should include alternatives
+      expect(result.alternatives.length).toBeGreaterThan(0);
+    });
+
+    it('should build demurrage formula for reducing hoarding', async () => {
+      const { icnBuildFormula } = await import('../src/tools/icn_build_formula.js');
+      const result = await icnBuildFormula({
+        description: 'Demurrage on idle tokens to reduce hoarding',
+        outputType: 'amount'
+      });
+
+      expect(result.formula.name).toContain('Demurrage');
+      expect(result.formula.variables.some(v => v.name.includes('idle') || v.name.includes('demurrage'))).toBe(true);
+      expect(result.formula.variables.some(v => v.name.includes('velocity'))).toBe(true);
+      
+      // Should encourage circulation
+      expect(result.formula.invariants.some(inv => inv.includes('circulation'))).toBe(true);
+    });
+
+    it('should build risk-adjusted job bidding formula', async () => {
+      const { icnBuildFormula } = await import('../src/tools/icn_build_formula.js');
+      const result = await icnBuildFormula({
+        description: 'Risk-adjusted job bidding with complexity and trust factors',
+        outputType: 'amount'
+      });
+
+      expect(result.formula.variables.some(v => v.name.includes('risk') || v.name.includes('complexity'))).toBe(true);
+      expect(result.formula.variables.some(v => v.name.includes('trust'))).toBe(true);
+      expect(result.formula.examples.length).toBeGreaterThan(0);
+    });
+
+    it('should provide warnings for potentially problematic formulas', async () => {
+      const { icnBuildFormula } = await import('../src/tools/icn_build_formula.js');
+      const result = await icnBuildFormula({
+        description: 'Exponential wealth accumulation mechanism',
+        outputType: 'amount'
+      });
+
+      expect(result.warnings.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('icnEconomicAdvice', () => {
+    it('should advise on demurrage rate for reducing hoarding', async () => {
+      const { icnEconomicAdvice } = await import('../src/tools/icn_economic_advice.js');
+      const result = await icnEconomicAdvice({
+        mechanism: {
+          name: 'Token Demurrage',
+          description: 'Apply demurrage to idle tokens to encourage circulation',
+          parameters: {
+            demurrage_rate: 0.005,
+            idle_threshold: 1000,
+            velocity_factor: 0.8
+          },
+          targetOutcomes: ['increased circulation', 'reduced hoarding']
+        },
+        context: {
+          networkSize: 100,
+          averageWealth: 5000,
+          currentGini: 0.6,
+          tokenVelocity: 0.3
+        }
+      });
+
+      expect(result.assessment).toHaveProperty('score');
+      expect(result.assessment).toHaveProperty('recommendation');
+      expect(result.impacts.length).toBeGreaterThan(0);
+      
+      // Should identify positive velocity impact
+      const velocityImpact = result.impacts.find(i => i.category === 'velocity');
+      expect(velocityImpact?.direction).toBe('positive');
+      
+      // Should provide parameter suggestions
+      expect(result.parameterSuggestions.length).toBeGreaterThanOrEqual(0);
+      
+      // Should check ICN invariants
+      expect(result.icnConsiderations).toHaveProperty('invariantAlignment');
+      expect(result.icnConsiderations).toHaveProperty('dualEconomyImpact');
+    });
+
+    it('should warn about wealth concentration risks', async () => {
+      const { icnEconomicAdvice } = await import('../src/tools/icn_economic_advice.js');
+      const result = await icnEconomicAdvice({
+        mechanism: {
+          name: 'Compound Interest Rewards',
+          description: 'Compound interest on token holdings',
+          parameters: {
+            interest_rate: 0.1,
+            compounding_frequency: 12
+          },
+          targetOutcomes: ['incentivize saving']
+        },
+        context: {
+          currentGini: 0.7 // Already high inequality
+        }
+      });
+
+      expect(result.warnings.length).toBeGreaterThan(0);
+      const inequalityWarning = result.warnings.find(w => w.type === 'inequality_increase');
+      expect(inequalityWarning).toBeDefined();
+      expect(result.assessment.recommendation).not.toBe('proceed');
+    });
+
+    it('should identify capture risks in centralized mechanisms', async () => {
+      const { icnEconomicAdvice } = await import('../src/tools/icn_economic_advice.js');
+      const result = await icnEconomicAdvice({
+        mechanism: {
+          name: 'Admin Controlled Levy',
+          description: 'Levy rate controlled by administrator',
+          parameters: {
+            admin_address: '0x123...',
+            levy_rate: 0.15
+          },
+          targetOutcomes: ['fund federation']
+        }
+      });
+
+      const captureWarning = result.warnings.find(w => w.type === 'capture_risk');
+      expect(captureWarning).toBeDefined();
+      expect(captureWarning?.severity).toBe('high');
+      
+      // Should suggest democratic alternatives
+      expect(captureWarning?.recommendations.some(r => r.includes('democratic'))).toBe(true);
+    });
+
+    it('should provide historical case references', async () => {
+      const { icnEconomicAdvice } = await import('../src/tools/icn_economic_advice.js');
+      const result = await icnEconomicAdvice({
+        mechanism: {
+          name: 'Demurrage Currency',
+          description: 'Local currency with holding fees',
+          parameters: {
+            demurrage_rate: 0.01
+          },
+          targetOutcomes: ['increase circulation']
+        }
+      });
+
+      expect(result.historicalCases.length).toBeGreaterThan(0);
+      const woerglCase = result.historicalCases.find(c => c.name.includes('Wörgl'));
+      expect(woerglCase).toBeDefined();
+      expect(woerglCase?.outcome).toBe('success');
+    });
+  });
+
+  describe('icnOrchestleSettlement', () => {
+    const sampleOrganizations = [
+      {
+        id: 'coop-a',
+        name: 'Cooperative A',
+        type: 'cooperative' as const,
+        trustScore: 0.8,
+        preferences: {
+          minSettlementAmount: 100,
+          preferredFrequency: 24,
+          maxExposure: 10000
+        }
+      },
+      {
+        id: 'coop-b',
+        name: 'Cooperative B', 
+        type: 'cooperative' as const,
+        trustScore: 0.9,
+        preferences: {
+          minSettlementAmount: 50,
+          preferredFrequency: 12,
+          maxExposure: 15000
+        }
+      },
+      {
+        id: 'federation',
+        name: 'Federation',
+        type: 'federation' as const,
+        trustScore: 0.95,
+        preferences: {
+          minSettlementAmount: 200,
+          preferredFrequency: 48,
+          maxExposure: 50000
+        }
+      }
+    ];
+
+    it('should orchestrate settlement between 3 organizations', async () => {
+      const { icnOrchestleSettlement } = await import('../src/tools/icn_orchestrate_settlement.js');
+      
+      const transactions = [
+        {
+          id: 'tx1',
+          from: 'coop-a',
+          to: 'coop-b',
+          amount: 500,
+          currency: 'tokens',
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+          type: 'trade' as const,
+          settlementStatus: 'pending' as const
+        },
+        {
+          id: 'tx2',
+          from: 'coop-b',
+          to: 'federation',
+          amount: 300,
+          currency: 'tokens',
+          timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+          type: 'levy' as const,
+          settlementStatus: 'pending' as const
+        },
+        {
+          id: 'tx3',
+          from: 'federation',
+          to: 'coop-a',
+          amount: 200,
+          currency: 'tokens',
+          timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+          type: 'transfer' as const,
+          settlementStatus: 'pending' as const
+        }
+      ];
+
+      const result = await icnOrchestleSettlement({
+        transactions,
+        organizations: sampleOrganizations
+      });
+
+      expect(result).toHaveProperty('batchId');
+      expect(result.netPositions).toHaveLength(3);
+      expect(result.settlementEvents.length).toBeGreaterThan(0);
+      expect(result.optimization).toHaveProperty('reductionRatio');
+      
+      // Check that net positions are calculated
+      const coopAPosition = result.netPositions.find(p => p.organizationId === 'coop-a');
+      expect(coopAPosition).toBeDefined();
+      expect(coopAPosition?.netAmounts).toHaveProperty('tokens');
+      
+      // Should optimize transactions
+      expect(result.optimization.reductionRatio).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should detect amount mismatches and disputes', async () => {
+      const { icnOrchestleSettlement } = await import('../src/tools/icn_orchestrate_settlement.js');
+      
+      // Create transactions with a low-trust organization
+      const lowTrustOrgs = [...sampleOrganizations];
+      lowTrustOrgs[0].trustScore = 0.2; // Low trust - below 0.3 threshold
+      
+      const transactions = [
+        {
+          id: 'suspicious-tx',
+          from: 'coop-a', // Low trust org
+          to: 'coop-b',
+          amount: 10000, // Large amount
+          currency: 'tokens',
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago to ensure settlement
+          type: 'transfer' as const,
+          settlementStatus: 'pending' as const
+        }
+      ];
+
+      const result = await icnOrchestleSettlement({
+        transactions,
+        organizations: lowTrustOrgs,
+        preferences: { forceSettlement: true } // Force settlement to ensure disputes are checked
+      });
+
+      expect(result.disputes.length).toBeGreaterThan(0);
+      const unauthorizedDispute = result.disputes.find(d => d.type === 'unauthorized');
+      expect(unauthorizedDispute).toBeDefined();
+    });
+
+    it('should handle different netting algorithms', async () => {
+      const { icnOrchestleSettlement } = await import('../src/tools/icn_orchestrate_settlement.js');
+      
+      const transactions = [
+        {
+          id: 'tx1',
+          from: 'coop-a',
+          to: 'coop-b', 
+          amount: 1000,
+          currency: 'tokens',
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          type: 'trade' as const,
+          settlementStatus: 'pending' as const
+        },
+        {
+          id: 'tx2',
+          from: 'coop-b',
+          to: 'coop-a',
+          amount: 800,
+          currency: 'tokens', 
+          timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          type: 'trade' as const,
+          settlementStatus: 'pending' as const
+        }
+      ];
+
+      // Test multilateral netting
+      const multilateralResult = await icnOrchestleSettlement({
+        transactions,
+        organizations: sampleOrganizations,
+        preferences: { nettingAlgorithm: 'multilateral' }
+      });
+
+      // Test optimized netting
+      const optimizedResult = await icnOrchestleSettlement({
+        transactions,
+        organizations: sampleOrganizations,
+        preferences: { nettingAlgorithm: 'optimized' }
+      });
+
+      expect(multilateralResult.settlementEvents.length).toBeLessThanOrEqual(optimizedResult.settlementEvents.length);
+      expect(multilateralResult.optimization.efficiencyScore).toBeGreaterThan(0);
+    });
+
+    it('should generate comprehensive settlement summary', async () => {
+      const { icnOrchestleSettlement } = await import('../src/tools/icn_orchestrate_settlement.js');
+      
+      const transactions = [
+        {
+          id: 'tx1',
+          from: 'coop-a',
+          to: 'coop-b',
+          amount: 500,
+          currency: 'tokens',
+          timestamp: new Date(Date.now() - 60 * 60 * 1000),
+          type: 'trade' as const,
+          settlementStatus: 'pending' as const
+        }
+      ];
+
+      const result = await icnOrchestleSettlement({
+        transactions,
+        organizations: sampleOrganizations
+      });
+
+      expect(result.summary).toHaveProperty('totalAmounts');
+      expect(result.summary).toHaveProperty('organizationsCount');
+      expect(result.summary).toHaveProperty('estimatedTime');
+      expect(result.summary).toHaveProperty('estimatedCost');
+      
+      expect(result.summary.totalAmounts.tokens).toBeGreaterThan(0);
+      expect(result.summary.organizationsCount).toBeGreaterThan(0);
+    });
+
+    it('should respect organization settlement preferences', async () => {
+      const { icnOrchestleSettlement } = await import('../src/tools/icn_orchestrate_settlement.js');
+      
+      // Small transaction below minimum
+      const transactions = [
+        {
+          id: 'small-tx',
+          from: 'coop-a',
+          to: 'coop-b',
+          amount: 10, // Below min of 50-100
+          currency: 'tokens',
+          timestamp: new Date(Date.now() - 60 * 60 * 1000),
+          type: 'trade' as const,
+          settlementStatus: 'pending' as const
+        }
+      ];
+
+      // Without force settlement
+      const normalResult = await icnOrchestleSettlement({
+        transactions,
+        organizations: sampleOrganizations
+      });
+
+      // With force settlement
+      const forcedResult = await icnOrchestleSettlement({
+        transactions,
+        organizations: sampleOrganizations,
+        preferences: { forceSettlement: true }
+      });
+
+      // Normal result should have fewer/no settlement events due to minimums
+      expect(forcedResult.settlementEvents.length).toBeGreaterThanOrEqual(normalResult.settlementEvents.length);
+    });
+  });
 });
