@@ -367,6 +367,90 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['type', 'context', 'feedback']
       }
+    },
+    {
+      name: 'icn_synthesize_spec',
+      description: 'Synthesize OpenAPI/JSON schema specifications from ICN surface principles and requirements',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          surface: {
+            type: 'string',
+            description: 'ICN surface name (e.g., "Identity", "Jobs", "Event Log", "Governance", "Issuance", or "Identity/Attestation")'
+          }
+        },
+        required: ['surface']
+      }
+    },
+    {
+      name: 'icn_check_invariants',
+      description: 'Check code or design proposals against ICN invariants (event-sourced, deterministic, democratic, non-transferable CC, no token-bought voting)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          code: {
+            type: 'string',
+            description: 'Source code to analyze for invariant compliance'
+          },
+          design: {
+            type: 'string',
+            description: 'Design proposal or specification to analyze'
+          },
+          description: {
+            type: 'string',
+            description: 'Text description of the component or feature to analyze'
+          }
+        }
+      }
+    },
+    {
+      name: 'icn_validate_implementation',
+      description: 'Validate source code implementation against synthesized specs and ICN principles',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          code: {
+            type: 'string',
+            description: 'Source code to validate'
+          },
+          surface: {
+            type: 'string',
+            description: 'Optional ICN surface to validate against (enables spec synthesis and validation)'
+          },
+          description: {
+            type: 'string',
+            description: 'Optional description of the component being validated'
+          }
+        },
+        required: ['code']
+      }
+    },
+    {
+      name: 'icn_generate_tests',
+      description: 'Generate comprehensive test cases for ICN components including happy paths, edge cases, and attack scenarios',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          component: {
+            type: 'string',
+            description: 'Component name to generate tests for'
+          },
+          surface: {
+            type: 'string',
+            description: 'Optional ICN surface name for specialized test generation'
+          },
+          requirements: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of specific requirements to test'
+          },
+          description: {
+            type: 'string',
+            description: 'Optional description of the component functionality'
+          }
+        },
+        required: ['component']
+      }
     }
   ];
 }

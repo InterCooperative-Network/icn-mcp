@@ -490,4 +490,245 @@ describe('ICN Tools', () => {
       });
     });
   });
+
+  describe('Specification Synthesis and Validation Framework', () => {
+    describe('icnSynthesizeSpec', () => {
+      it('should synthesize spec for Identity surface', async () => {
+        const { icnSynthesizeSpec } = await import('../src/tools/icn_synthesize_spec.js');
+        const result = await icnSynthesizeSpec({ surface: 'Identity' });
+        
+        expect(result).toHaveProperty('surface', 'Identity');
+        expect(result).toHaveProperty('openapi');
+        expect(result).toHaveProperty('requirements');
+        expect(result).toHaveProperty('invariants');
+        expect(result).toHaveProperty('reasoning');
+        
+        expect(result.openapi.info.title).toContain('Identity');
+        expect(result.requirements.length).toBeGreaterThan(0);
+        expect(result.invariants.length).toBe(5); // 5 core ICN invariants
+        expect(result.reasoning.length).toBeGreaterThan(0);
+      });
+
+      it('should synthesize spec for Event Log surface', async () => {
+        const { icnSynthesizeSpec } = await import('../src/tools/icn_synthesize_spec.js');
+        const result = await icnSynthesizeSpec({ surface: 'Event Log' });
+        
+        expect(result.surface).toBe('Event Log');
+        expect(result.openapi.paths).toHaveProperty('/events/append');
+        expect(result.requirements.some(r => r.field === 'eventId')).toBe(true);
+        expect(result.requirements.some(r => r.field === 'hash')).toBe(true);
+      });
+
+      it('should handle Identity/Attestation subsurface', async () => {
+        const { icnSynthesizeSpec } = await import('../src/tools/icn_synthesize_spec.js');
+        const result = await icnSynthesizeSpec({ surface: 'Identity/Attestation' });
+        
+        expect(result.surface).toBe('Identity/Attestation');
+        expect(result.openapi.paths).toHaveProperty('/attestation/create');
+        expect(result.requirements.some(r => r.field === 'attestationId')).toBe(true);
+      });
+
+      it('should throw error for unknown surface', async () => {
+        const { icnSynthesizeSpec } = await import('../src/tools/icn_synthesize_spec.js');
+        await expect(icnSynthesizeSpec({ surface: 'NonExistent' }))
+          .rejects.toThrow('Unknown ICN surface');
+      });
+    });
+
+    describe('icnCheckInvariants', () => {
+      it('should pass for compliant event-sourced code', async () => {
+        const { icnCheckInvariants } = await import('../src/tools/icn_check_invariants.js');
+        const code = `
+          async function createMember(data) {
+            const event = { eventType: 'MemberCreated', payload: data };
+            await eventLog.append(event);
+            return event;
+          }
+        `;
+        
+        const result = await icnCheckInvariants({ code });
+        
+        expect(result).toHaveProperty('overallPass');
+        expect(result).toHaveProperty('checks');
+        expect(result.checks.length).toBe(5);
+        
+        const eventSourceCheck = result.checks.find(c => c.id === 'INV-EVENTSOURCE-001');
+        expect(eventSourceCheck?.passed).toBe(true);
+        expect(eventSourceCheck?.evidence.length).toBeGreaterThan(0);
+      });
+
+      it('should fail for non-deterministic code', async () => {
+        const { icnCheckInvariants } = await import('../src/tools/icn_check_invariants.js');
+        const code = `
+          function generateId() {
+            return Math.random().toString();
+          }
+          function createMember() {
+            const id = Date.now();
+            return { id, random: Math.random() };
+          }
+        `;
+        
+        const result = await icnCheckInvariants({ code });
+        
+        const deterministicCheck = result.checks.find(c => c.id === 'INV-DETERMINISTIC-001');
+        expect(deterministicCheck?.passed).toBe(false);
+        expect(deterministicCheck?.violations.length).toBeGreaterThan(0);
+        expect(deterministicCheck?.suggestions.length).toBeGreaterThan(0);
+      });
+
+      it('should fail for CC transfer code', async () => {
+        const { icnCheckInvariants } = await import('../src/tools/icn_check_invariants.js');
+        const code = `
+          function transferCC(from, to, amount) {
+            from.ccBalance -= amount;
+            to.ccBalance += amount;
+          }
+        `;
+        
+        const result = await icnCheckInvariants({ code });
+        
+        const transferCheck = result.checks.find(c => c.id === 'INV-NONTRANSFERABLE-001');
+        expect(transferCheck?.passed).toBe(false);
+        expect(transferCheck?.violations.some(v => v.includes('transfer'))).toBe(true);
+      });
+
+      it('should work with design descriptions', async () => {
+        const { icnCheckInvariants } = await import('../src/tools/icn_check_invariants.js');
+        const design = `
+          This system will use event sourcing to track all state changes.
+          Each member gets one vote per proposal, ensuring democratic governance.
+          Contribution Credits are non-transferable and bound to individual members.
+        `;
+        
+        const result = await icnCheckInvariants({ design });
+        
+        expect(result.overallPass).toBe(false); // Design text alone may not pass all checks
+        expect(result.checks.some(c => c.evidence.length > 0)).toBe(true); // But should find some evidence
+      });
+    });
+
+    describe('icnValidateImplementation', () => {
+      it('should validate correct Identity implementation', async () => {
+        const { icnValidateImplementation } = await import('../src/tools/icn_validate_implementation.js');
+        const code = `
+          export interface Identity {
+            memberId: string;
+            publicKey: string;
+            attestations: string[];
+            created: string;
+            status: 'active' | 'revoked';
+          }
+
+          export async function createIdentity(data: Identity): Promise<{success: boolean, identity: Identity}> {
+            const event = { eventType: 'IdentityCreated', payload: data };
+            await eventLog.append(event);
+            return { success: true, identity: data };
+          }
+        `;
+        
+        const result = await icnValidateImplementation({ 
+          code, 
+          surface: 'Identity',
+          description: 'Identity management component'
+        });
+        
+        expect(result).toHaveProperty('valid');
+        expect(result).toHaveProperty('issues');
+        expect(result).toHaveProperty('score');
+        expect(result).toHaveProperty('patterns');
+        expect(result.score).toBeGreaterThan(0);
+        expect(result.patterns.good.length).toBeGreaterThan(0);
+      });
+
+      it('should catch violations in bad implementation', async () => {
+        const { icnValidateImplementation } = await import('../src/tools/icn_validate_implementation.js');
+        const code = `
+          let globalState = {};
+          
+          function updateMember(id) {
+            globalState[id] = Math.random();
+            return globalState[id];
+          }
+          
+          function transferCC(from, to, amount) {
+            globalState[from] -= amount;
+            globalState[to] += amount;
+          }
+        `;
+        
+        const result = await icnValidateImplementation({ code });
+        
+        expect(result.valid).toBe(false);
+        expect(result.issues.length).toBeGreaterThan(0);
+        expect(result.patterns.bad.length).toBeGreaterThan(0);
+        expect(result.suggestions.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe('icnGenerateTests', () => {
+      it('should generate tests for Governance component', async () => {
+        const { icnGenerateTests } = await import('../src/tools/icn_generate_tests.js');
+        const result = await icnGenerateTests({ 
+          component: 'Governance',
+          description: 'Democratic voting system'
+        });
+        
+        expect(result).toHaveProperty('testSuites');
+        expect(result).toHaveProperty('coverage');
+        expect(result).toHaveProperty('recommendations');
+        
+        expect(result.testSuites.length).toBe(1);
+        const testSuite = result.testSuites[0];
+        
+        expect(testSuite.component).toBe('Governance');
+        expect(testSuite.testCases.length).toBeGreaterThan(0);
+        expect(testSuite.imports.length).toBeGreaterThan(0);
+        
+        // Check for different test types
+        expect(testSuite.testCases.some(t => t.category === 'happy_path')).toBe(true);
+        expect(testSuite.testCases.some(t => t.category === 'edge_case')).toBe(true);
+        expect(testSuite.testCases.some(t => t.category === 'security')).toBe(true);
+        expect(testSuite.testCases.some(t => t.category === 'invariant')).toBe(true);
+      });
+
+      it('should generate tests for Event Log component', async () => {
+        const { icnGenerateTests } = await import('../src/tools/icn_generate_tests.js');
+        const result = await icnGenerateTests({ 
+          component: 'Event Log',
+          surface: 'Event Log'
+        });
+        
+        const testSuite = result.testSuites[0];
+        expect(testSuite.component).toBe('Event Log');
+        
+        // Should have event-specific tests
+        expect(testSuite.testCases.some(t => 
+          t.name.includes('append') || t.name.includes('event')
+        )).toBe(true);
+        
+        // Coverage should include attack scenarios for immutability
+        expect(result.coverage.attackScenarios).toBeGreaterThan(0);
+      });
+
+      it('should include comprehensive coverage metrics', async () => {
+        const { icnGenerateTests } = await import('../src/tools/icn_generate_tests.js');
+        const result = await icnGenerateTests({ component: 'Jobs' });
+        
+        expect(result.coverage).toHaveProperty('happyPaths');
+        expect(result.coverage).toHaveProperty('edgeCases');
+        expect(result.coverage).toHaveProperty('attackScenarios');
+        expect(result.coverage).toHaveProperty('invariantChecks');
+        
+        expect(result.coverage.happyPaths).toBeGreaterThan(0);
+        expect(result.coverage.invariantChecks).toBeGreaterThan(0);
+      });
+
+      it('should throw error for unknown component', async () => {
+        const { icnGenerateTests } = await import('../src/tools/icn_generate_tests.js');
+        await expect(icnGenerateTests({ component: 'UnknownComponent' }))
+          .rejects.toThrow('Unknown component type');
+      });
+    });
+  });
 });
