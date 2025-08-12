@@ -719,7 +719,7 @@ function generateAdvancedSelectionReason(member: EligibleMember, weight: number,
 function assessFairness(
   selectedMembers: Array<{ member: EligibleMember; selectionScore: number; selectionReason: string }>,
   fairness: NonNullable<SortitionRequest['fairness']>,
-  eligiblePool: EligibleMember[]
+  _eligiblePool: EligibleMember[]
 ): {
   thresholdsMet: boolean;
   diversityAchieved: boolean;
@@ -796,7 +796,7 @@ function repairDiversity(
   selectedMembers: Array<{ member: EligibleMember; selectionScore: number; selectionReason: string }>,
   weightedPool: Array<{ member: EligibleMember; weight: number }>,
   fairness: NonNullable<SortitionRequest['fairness']>,
-  rng: () => number
+  _rng: () => number
 ): Array<{ member: EligibleMember; selectionScore: number; selectionReason: string }> {
   // Simple diversity repair: find the lowest-scored selection and try to replace with a more diverse candidate
   const selectedIds = new Set(selectedMembers.map(s => s.member.id));
@@ -858,88 +858,66 @@ function generateSelectionExplanations(
   return explanations;
 }
 
-function calculateWeight(member: EligibleMember, preference: WeightingPreference): number {
-  let value: number;
-  
-  // Extract value based on attribute
-  switch (preference.attribute) {
-    case 'participationHistory':
-      value = member.participationHistory.participationRate;
-      break;
-    case 'trustScore':
-      value = member.reputation.trustScore;
-      break;
-    case 'previousSelections': {
-      // Inverse weighting for fairness - fewer previous selections get higher weight
-      const maxSelections = 10; // Reasonable upper bound
-      value = 1 - (member.participationHistory.previousSelections / maxSelections);
-      value = Math.max(0.1, value); // Minimum weight
-      break;
-    }
-    case 'performanceScore':
-      value = member.participationHistory.performanceScores.reduce((a, b) => a + b, 0) / 
-              member.participationHistory.performanceScores.length || 0.5;
-      break;
-    default:
-      value = 0.5; // Neutral default
-  }
-  
-  // Apply weighting function
-  switch (preference.function) {
-    case 'linear':
-      return 1 + (value - 0.5) * (preference.weight - 1) * 2;
-    case 'exponential':
-      return Math.pow(preference.weight, value);
-    case 'logarithmic':
-      return 1 + Math.log(1 + value * (preference.weight - 1));
-    case 'threshold': {
-      const threshold = preference.parameters?.threshold || 0.5;
-      return value >= threshold ? preference.weight : 1.0;
-    }
-    default:
-      return preference.weight;
-  }
-}
+// Legacy function - kept for potential backward compatibility
+// function calculateWeight(member: EligibleMember, preference: WeightingPreference): number {
+//   let value: number;
+//   
+//   // Extract value based on attribute
+//   switch (preference.attribute) {
+//     case 'participationHistory':
+//       value = member.participationHistory.participationRate;
+//       break;
+//     case 'trustScore':
+//       value = member.reputation.trustScore;
+//       break;
+//     case 'previousSelections': {
+//       // Inverse weighting for fairness - fewer previous selections get higher weight
+//       const maxSelections = 10; // Reasonable upper bound
+//       value = 1 - (member.participationHistory.previousSelections / maxSelections);
+//       value = Math.max(0.1, value); // Minimum weight
+//       break;
+//     }
+//     case 'performanceScore':
+//       value = member.participationHistory.performanceScores.reduce((a, b) => a + b, 0) / 
+//               member.participationHistory.performanceScores.length || 0.5;
+//       break;
+//     default:
+//       value = 0.5; // Neutral default
+//   }
+//   
+//   // Apply weighting function
+//   switch (preference.function) {
+//     case 'linear':
+//       return 1 + (value - 0.5) * (preference.weight - 1) * 2;
+//     case 'exponential':
+//       return Math.pow(preference.weight, value);
+//     case 'logarithmic':
+//       return 1 + Math.log(1 + value * (preference.weight - 1));
+//     case 'threshold': {
+//       const threshold = preference.parameters?.threshold || 0.5;
+//       return value >= threshold ? preference.weight : 1.0;
+//     }
+//     default:
+//       return preference.weight;
+//   }
+// }
 
-function performSelection(
-  weightedPool: Array<{ member: EligibleMember; weight: number }>,
-  positions: number,
-  parameters: SortitionRequest['parameters']
-): Array<{ member: EligibleMember; selectionScore: number; selectionReason: string }> {
-  // Create simple RNG for backwards compatibility
-  const rng = parameters.cryptographicRandom ? 
-    () => crypto.getRandomValues(new Uint32Array(1))[0] / 0xFFFFFFFF :
-    () => Math.random();
-  
-  // Set seed for reproducibility if provided (legacy behavior)
-  if (parameters.randomSeed && !parameters.cryptographicRandom) {
-    let seed = hashCode(parameters.randomSeed);
-    const legacyRng = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-    return performAdvancedSelection(weightedPool, positions, legacyRng, 0);
-  }
-  
-  return performAdvancedSelection(weightedPool, positions, rng, 0);
-}
-
-// Keep old applyWeighting function for backward compatibility
-function applyWeighting(
-  members: EligibleMember[], 
-  weightingPreferences: WeightingPreference[]
-): Array<{ member: EligibleMember; weight: number }> {
-  return members.map(member => {
-    let totalWeight = 1.0;
-    
-    for (const preference of weightingPreferences) {
-      const weight = calculateWeight(member, preference);
-      totalWeight *= weight;
-    }
-    
-    return { member, weight: totalWeight };
-  });
-}
+// Legacy function - kept for potential backward compatibility  
+// function applyWeighting(
+//   members: EligibleMember[], 
+//   weightingPreferences: WeightingPreference[]
+// ): Array<{ member: EligibleMember; weight: number }> {
+//   return members.map(member => {
+//     let totalWeight = 1.0;
+//     
+//     for (const preference of weightingPreferences) {
+//       const weight = calculateWeight(member, preference);
+//       totalWeight *= weight;
+//     }
+//     
+//     return { member, weight: totalWeight };
+//   });
+// }
 
 function selectReplacements(
   weightedPool: Array<{ member: EligibleMember; weight: number }>,
@@ -959,28 +937,29 @@ function selectReplacements(
   }));
 }
 
-function generateSelectionReason(member: EligibleMember, weight: number): string {
-  const reasons: string[] = [];
-  
-  if (weight > 1.2) {
-    reasons.push('high qualifications and performance');
-  }
-  if (member.reputation.trustScore > 0.8) {
-    reasons.push('excellent trust score');
-  }
-  if (member.participationHistory.participationRate > 0.8) {
-    reasons.push('strong participation history');
-  }
-  if (member.participationHistory.previousSelections === 0) {
-    reasons.push('first-time selection for fairness');
-  }
-  
-  if (reasons.length === 0) {
-    return 'random selection from qualified pool';
-  }
-  
-  return `Selected for: ${reasons.join(', ')}`;
-}
+// Legacy function - kept for potential backward compatibility
+// function generateSelectionReason(member: EligibleMember, weight: number): string {
+//   const reasons: string[] = [];
+//   
+//   if (weight > 1.2) {
+//     reasons.push('high qualifications and performance');
+//   }
+//   if (member.reputation.trustScore > 0.8) {
+//     reasons.push('excellent trust score');
+//   }
+//   if (member.participationHistory.participationRate > 0.8) {
+//     reasons.push('strong participation history');
+//   }
+//   if (member.participationHistory.previousSelections === 0) {
+//     reasons.push('first-time selection for fairness');
+//   }
+//   
+//   if (reasons.length === 0) {
+//     return 'random selection from qualified pool';
+//   }
+//   
+//   return `Selected for: ${reasons.join(', ')}`;
+// }
 
 function generateProcessDetails(
   request: SortitionRequest,
@@ -1205,15 +1184,16 @@ function generateNextSteps(
 }
 
 // Utility functions
-function hashCode(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash);
-}
+// Legacy hashCode function - kept for potential backward compatibility
+// function hashCode(str: string): number {
+//   let hash = 0;
+//   for (let i = 0; i < str.length; i++) {
+//     const char = str.charCodeAt(i);
+//     hash = ((hash << 5) - hash) + char;
+//     hash = hash & hash; // Convert to 32-bit integer
+//   }
+//   return Math.abs(hash);
+// }
 
 function calculateGiniCoefficient(values: number[]): number {
   if (values.length === 0) return 0;

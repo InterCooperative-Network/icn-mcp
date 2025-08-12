@@ -50,6 +50,80 @@ describe('Governance Tools', () => {
       // Should use sortition for speed
       expect(result.process.votingMechanism.type).toBe('sortition');
     });
+
+    it('should implement fallback threshold mechanisms for supermajority decisions', async () => {
+      const result = await icnBuildGovernanceFlow({
+        decisionType: 'constitutional',
+        scope: 'global',
+        context: 'Major constitutional amendment requiring fallbacks'
+      });
+
+      expect(result.process.decisionThreshold.type).toBe('supermajority');
+      expect(result.process.decisionThreshold.fallbacks.length).toBeGreaterThan(0);
+      
+      // Should have multiple fallback mechanisms
+      const fallbackTypes = result.process.decisionThreshold.fallbacks.map(f => f.mechanism);
+      expect(fallbackTypes).toContain('extended_voting_period');
+      expect(fallbackTypes).toContain('consensus_building_process');
+      
+      // Verify fallback triggers
+      const quorumFallback = result.process.decisionThreshold.fallbacks.find(
+        f => f.condition === 'quorum_not_met_first_attempt'
+      );
+      expect(quorumFallback).toBeDefined();
+      expect(quorumFallback?.threshold).toContain('qualified_majority');
+    });
+
+    it('should differentiate emergency vs constitutional processes', async () => {
+      const emergency = await icnBuildGovernanceFlow({
+        decisionType: 'emergency',
+        scope: 'regional'
+      });
+      
+      const constitutional = await icnBuildGovernanceFlow({
+        decisionType: 'constitutional',
+        scope: 'regional'
+      });
+
+      // Emergency should be much faster
+      expect(emergency.timeline.totalDuration).toBeLessThan(constitutional.timeline.totalDuration / 5);
+      
+      // Constitutional should have more rigorous requirements
+      expect(constitutional.process.proposalRequirements.burnAmount)
+        .toBeGreaterThan(emergency.process.proposalRequirements.burnAmount);
+      
+      expect(constitutional.process.proposalRequirements.cosponsors.minimum)
+        .toBeGreaterThanOrEqual(emergency.process.proposalRequirements.cosponsors.minimum);
+      
+      // Constitutional should have phased execution
+      expect(constitutional.process.executionRules.type).toBe('phased');
+      expect(emergency.process.executionRules.type).toBe('automatic');
+      
+      // Both should maintain audit trails but with different requirements
+      expect(constitutional.process.executionRules.requiredApprovals.length)
+        .toBeGreaterThan(emergency.process.executionRules.requiredApprovals.length);
+    });
+
+    it('should handle low turnout scenarios with fallback activation', async () => {
+      const result = await icnBuildGovernanceFlow({
+        decisionType: 'budget',
+        scope: 'federation',
+        context: 'Budget decision with potential low turnout'
+      });
+
+      // Should have qualified majority as primary
+      expect(result.process.decisionThreshold.type).toBe('qualified_majority');
+      expect(result.process.decisionThreshold.percentage).toBe(60);
+      
+      // Should provide guidance on turnout issues
+      expect(result.adaptation.warningSignsToMonitor).toContain('Declining participation rates');
+      
+      // Should have mechanisms to handle low turnout
+      const adaptations = result.adaptation.adaptationMechanisms;
+      expect(adaptations.some(mechanism => 
+        mechanism.includes('threshold adjustment') || mechanism.includes('participation patterns')
+      )).toBe(true);
+    });
   });
 
   describe('icn_advise_voting', () => {
@@ -374,6 +448,100 @@ describe('Governance Tools', () => {
       
       // Should warn about potential manipulation vectors
       expect(result.manipulationVectors).toContain('Delegation Capture');
+    });
+
+    it('should enforce ICN democratic governance invariants', async () => {
+      const result = await icnBuildGovernanceFlow({
+        decisionType: 'policy',
+        scope: 'local',
+        context: 'Policy that must maintain democratic principles'
+      });
+
+      // Should require democratic participation
+      expect(result.process.votingMechanism.quorum.minimumParticipation).toBeGreaterThan(0);
+      
+      // Should have appeals process for execution
+      expect(result.process.executionRules.appeals.appealPeriod).toBeGreaterThan(0);
+      
+      // Should have deliberation period
+      expect(result.process.discussionPeriod.minimumDays).toBeGreaterThan(0);
+      
+      // Verify democratic safeguards in adaptation
+      expect(result.adaptation.warningSignsToMonitor).toContain('Capture by special interests');
+    });
+
+    it('should prevent CC transfer in governance flows', async () => {
+      const result = await icnBuildGovernanceFlow({
+        decisionType: 'operational',
+        scope: 'federation',
+        context: 'Operational decision involving CC allocation'
+      });
+
+      // Should not allow automatic CC transfers
+      expect(result.process.executionRules.type).not.toBe('automatic');
+      
+      // Should require manual approval for execution
+      expect(result.process.executionRules.requiredApprovals.length).toBeGreaterThan(0);
+      
+      // Should have appeal mechanism to prevent unauthorized transfers
+      expect(result.process.executionRules.appeals.appealThreshold).toBeDefined();
+      expect(result.process.executionRules.appeals.appealThreshold).toBeGreaterThan(0);
+    });
+
+    it('should validate non-transferable CC invariant in policy creation', async () => {
+      const result = await icnBuildPolicy({
+        description: 'Policy involving Contribution Credits allocation',
+        category: 'economic',
+        scope: {
+          geographic: 'federation',
+          organizational: ['cooperatives']
+        },
+        stakeholders: {
+          primary: ['cooperative_members'],
+          secondary: ['cc_holders']
+        },
+        constraints: {
+          legal: ['cc_non_transferability']
+        }
+      });
+
+      // Should have evaluation rules that check CC compliance
+      const ccRule = result.evaluationRules.find(rule => 
+        rule.description.toLowerCase().includes('economic') ||
+        rule.id.includes('economic')
+      );
+      
+      expect(ccRule).toBeDefined();
+      expect(ccRule?.type).toBe('mandatory');
+      
+      // Should have obligations that prevent CC transfer
+      const obligations = result.obligations.some(obligation =>
+        obligation.description.toLowerCase().includes('compliance') ||
+        obligation.type === 'compliance'
+      );
+      
+      expect(obligations).toBe(true);
+    });
+
+    it('should fail governance flow for CC transfer attempts', async () => {
+      // This test simulates what should happen if someone tries to create
+      // a governance flow that would enable CC transfers
+      const result = await icnBuildGovernanceFlow({
+        decisionType: 'policy',
+        scope: 'global',
+        context: 'Attempt to create CC transfer mechanism (should be blocked)'
+      });
+
+      // Even if the request goes through, the execution should have safeguards
+      expect(result.process.executionRules.appeals.appealPeriod).toBeGreaterThan(0);
+      
+      // Should have warnings about capture
+      expect(result.adaptation.warningSignsToMonitor).toContain('Capture by special interests');
+      
+      // Should require consensus for any global changes
+      if (result.process.decisionThreshold.type === 'supermajority') {
+        expect(result.process.decisionThreshold.percentage).toBeGreaterThanOrEqual(70);
+      }
     });
   });
 

@@ -511,8 +511,14 @@ function configureExecutionRules(decisionType: string, scope: string): Execution
   if (decisionType === 'constitutional') {
     requiredApprovals.push('legal_review', 'implementation_plan_approval');
   }
+  if (decisionType === 'operational' && scope !== 'local') {
+    requiredApprovals.push('operational_review'); // Add safeguard for non-local operational decisions
+  }
   if (scope === 'global') {
     requiredApprovals.push('federation_coordination');
+  }
+  if (scope === 'federation') {
+    requiredApprovals.push('federation_oversight');
   }
   
   const phases = executionType === 'phased' ? [

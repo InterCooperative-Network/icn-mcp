@@ -854,7 +854,7 @@ function createInitialVersion(): PolicyVersion[] {
 
 async function detectConflicts(
   request: PolicyBuildRequest,
-  scope: PolicyScope,
+  _scope: PolicyScope,
   _rules: EvaluationRule[]
 ): Promise<ConflictDetection> {
   // In a real implementation, this would query existing policies
