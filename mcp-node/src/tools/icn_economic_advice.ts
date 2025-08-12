@@ -150,7 +150,7 @@ export async function icnEconomicAdvice(request: EconomicAdviceRequest): Promise
   };
 }
 
-function analyzeImpacts(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis[] {
+function analyzeImpacts(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis[] {
   const impacts: ImpactAnalysis[] = [];
   
   // Analyze wealth distribution impact
@@ -171,9 +171,9 @@ function analyzeImpacts(mechanism: EconomicMechanism, _context: Record<string, a
   return impacts.filter(impact => impact.magnitude > 0.1); // Only include significant impacts
 }
 
-function analyzeWealthDistributionImpact(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis {
+function analyzeWealthDistributionImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
-  const _ = context.currentGini || 0.3;
+  const currentGini = context.currentGini || 0.3;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
   let magnitude = 0.1;
@@ -225,9 +225,9 @@ function analyzeWealthDistributionImpact(mechanism: EconomicMechanism, _context:
   };
 }
 
-function analyzeParticipationImpact(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis {
+function analyzeParticipationImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
-  const _ = context.networkSize || 100;
+  const networkSize = context.networkSize || 100; const tokenVelocity = context.tokenVelocity || 0.5; const currentGini = context.networkSize || 100;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
   let magnitude = 0.1;
@@ -269,9 +269,9 @@ function analyzeParticipationImpact(mechanism: EconomicMechanism, _context: Reco
   };
 }
 
-function analyzeVelocityImpact(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis {
+function analyzeVelocityImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
-  const _ = context.tokenVelocity || 0.5;
+  const networkSize = context.networkSize || 100; const tokenVelocity = context.tokenVelocity || 0.5; const currentGini = context.tokenVelocity || 0.5;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
   let magnitude = 0.1;
@@ -309,7 +309,7 @@ function analyzeVelocityImpact(mechanism: EconomicMechanism, _context: Record<st
   };
 }
 
-function analyzeStabilityImpact(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis {
+function analyzeStabilityImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters } = mechanism;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
@@ -347,7 +347,7 @@ function analyzeStabilityImpact(mechanism: EconomicMechanism, _context: Record<s
   };
 }
 
-function analyzeGovernanceImpact(mechanism: EconomicMechanism, _context: Record<string, any>): ImpactAnalysis {
+function analyzeGovernanceImpact(mechanism: EconomicMechanism, context: Record<string, any>): ImpactAnalysis {
   const { name, parameters, description } = mechanism;
   
   let direction: ImpactAnalysis['direction'] = 'neutral';
@@ -424,7 +424,7 @@ function identifyWarnings(
   return warnings;
 }
 
-function identifyCaptureRisks(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
+function identifyCaptureRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
   const { name, parameters, description } = mechanism;
   
@@ -465,7 +465,7 @@ function identifyCaptureRisks(mechanism: EconomicMechanism, _context: Record<str
   return warnings;
 }
 
-function identifyHoardingRisks(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
+function identifyHoardingRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
   const { name, parameters } = mechanism;
   
@@ -504,10 +504,10 @@ function identifyHoardingRisks(mechanism: EconomicMechanism, _context: Record<st
   return warnings;
 }
 
-function identifyInequalityRisks(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
+function identifyInequalityRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
   const { name, parameters } = mechanism;
-  const _ = context.currentGini || 0.3;
+  const networkSize = context.networkSize || 100; const tokenVelocity = context.tokenVelocity || 0.5; const currentGini = context.currentGini || 0.3;
   
   // Check for regressive mechanisms
   const hasFixedCosts = Object.keys(parameters).some(key => 
@@ -553,7 +553,7 @@ function identifyInequalityRisks(mechanism: EconomicMechanism, _context: Record<
   return warnings;
 }
 
-function identifyParticipationBarriers(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
+function identifyParticipationBarriers(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
   const { parameters } = mechanism;
   const averageWealth = context.averageWealth || 1000;
@@ -593,7 +593,7 @@ function identifyParticipationBarriers(mechanism: EconomicMechanism, _context: R
   return warnings;
 }
 
-function identifyInstabilityRisks(mechanism: EconomicMechanism, _context: Record<string, any>): EconomicWarning[] {
+function identifyInstabilityRisks(mechanism: EconomicMechanism, context: Record<string, any>): EconomicWarning[] {
   const warnings: EconomicWarning[] = [];
   const { parameters } = mechanism;
   

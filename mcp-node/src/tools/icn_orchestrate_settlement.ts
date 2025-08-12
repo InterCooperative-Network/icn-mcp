@@ -275,7 +275,7 @@ function filterSettleableTransactions(
     
     // Check organization preferences
     const fromOrg = organizations.find(org => org.id === tx.from);
-    const _ = organizations.find(org => org.id === tx.to);
+    const toOrg = organizations.find(org => org.id === tx.to);
     
     if (!fromOrg || !toOrg) return false;
     
@@ -395,16 +395,16 @@ function generateSimpleSettlement(
         // Determine settlement direction and amount
         let settlementAmount = 0;
         let fromOrg = '';
-        let _ = '';
+        let toOrg = '';
         
         if (amount1 > 0 && amount2 < 0) {
           settlementAmount = Math.min(amount1, Math.abs(amount2));
           fromOrg = pos2.organizationId;
-          _ = pos1.organizationId;
+          toOrg = pos1.organizationId;
         } else if (amount1 < 0 && amount2 > 0) {
           settlementAmount = Math.min(Math.abs(amount1), amount2);
           fromOrg = pos1.organizationId;
-          _ = pos2.organizationId;
+          toOrg = pos2.organizationId;
         }
         
         if (settlementAmount > 0) {
@@ -508,7 +508,7 @@ function generateOptimizedSettlement(
   return events;
 }
 
-function optimizeByTrust(events: SettlementEvent[], _organizations: Organization[]): SettlementEvent[] {
+function optimizeByTrust(events: SettlementEvent[], organizations: Organization[]): SettlementEvent[] {
   const orgTrust = new Map(organizations.map(org => [org.id, org.trustScore]));
   
   // Prioritize settlements involving high-trust organizations
