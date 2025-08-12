@@ -12,10 +12,10 @@ export interface PolicyBuildRequest {
     /** Organizational scope */
     organizational: string[];
     /** Temporal scope */
-    temporal: {
-      startDate?: Date;
-      endDate?: Date;
-      duration?: number; // in days
+    temporal?: {
+      startDate?: string;
+      endDate?: string;
+      durationDays?: number;
     };
   };
   /** Policy constraints and requirements */
@@ -238,6 +238,8 @@ export interface ConflictDetection {
     severity: 'minor' | 'moderate' | 'major' | 'blocking';
     /** Proposed resolution */
     resolution?: string;
+    /** Temporal overlap period */
+    temporalOverlap?: [string, string];
   }>;
   /** Dependencies on other policies */
   dependencies: Array<{
@@ -852,25 +854,42 @@ function createInitialVersion(): PolicyVersion[] {
 
 async function detectConflicts(
   request: PolicyBuildRequest,
-  _scope: PolicyScope,
+  scope: PolicyScope,
   _rules: EvaluationRule[]
 ): Promise<ConflictDetection> {
   // In a real implementation, this would query existing policies
-  // For now, we'll simulate some potential conflicts
+  // For now, we'll simulate some potential conflicts with temporal analysis
   
   const conflicts: ConflictDetection['conflicts'] = [];
   const dependencies: ConflictDetection['dependencies'] = [];
   const impacts: ConflictDetection['impacts'] = [];
   
+  // Process temporal scope
+  const temporalScope = processTemporalScope(request.scope.temporal);
+  
   // Simulate conflicts based on category and scope
   if (request.category === 'governance' && request.scope.geographic === 'global') {
-    conflicts.push({
+    const conflict: ConflictDetection['conflicts'][0] = {
       policyId: 'existing-global-governance-001',
       type: 'overlap' as const,
       description: 'Overlapping authority with existing global governance framework',
       severity: 'moderate' as const,
       resolution: 'Define clear boundaries and precedence rules'
-    });
+    };
+    
+    // Add temporal overlap if both policies have temporal scope
+    if (temporalScope.startDate && temporalScope.endDate) {
+      // Simulate existing policy with overlapping period
+      const existingStart = new Date(temporalScope.startDate.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days before
+      const existingEnd = new Date(temporalScope.endDate.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days after
+      
+      conflict.temporalOverlap = [
+        Math.max(temporalScope.startDate.getTime(), existingStart.getTime()),
+        Math.min(temporalScope.endDate.getTime(), existingEnd.getTime())
+      ].map(timestamp => new Date(timestamp).toISOString()) as [string, string];
+    }
+    
+    conflicts.push(conflict);
   }
   
   if (request.category === 'economic') {
@@ -882,11 +901,109 @@ async function detectConflicts(
     });
   }
   
+  // Check for temporal conflicts with simulated policies
+  if (temporalScope.startDate && temporalScope.endDate) {
+    const simulatedPolicies = [
+      {
+        id: 'temp-policy-1',
+        category: request.category,
+        temporal: {
+          startDate: new Date(temporalScope.startDate.getTime() + 10 * 24 * 60 * 60 * 1000), // 10 days later
+          endDate: new Date(temporalScope.endDate.getTime() + 40 * 24 * 60 * 60 * 1000) // 40 days later
+        }
+      }
+    ];
+    
+    for (const policy of simulatedPolicies) {
+      if (policy.category === request.category) {
+        const overlap = calculateTemporalOverlap(temporalScope, policy.temporal);
+        if (overlap) {
+          conflicts.push({
+            policyId: policy.id,
+            type: 'overlap',
+            description: `Temporal overlap detected with ${policy.category} policy`,
+            severity: 'moderate',
+            resolution: 'Adjust effective dates or merge policies',
+            temporalOverlap: [overlap.start.toISOString(), overlap.end.toISOString()]
+          });
+        }
+      }
+    }
+  }
+  
   return {
     conflicts,
     dependencies,
     impacts
   };
+}
+
+function processTemporalScope(temporal?: PolicyBuildRequest['scope']['temporal']): {
+  startDate?: Date;
+  endDate?: Date;
+  isValid: boolean;
+  validationErrors: string[];
+} {
+  const result = {
+    startDate: undefined as Date | undefined,
+    endDate: undefined as Date | undefined,
+    isValid: true,
+    validationErrors: [] as string[]
+  };
+  
+  if (!temporal) {
+    return result;
+  }
+  
+  // Parse dates
+  if (temporal.startDate) {
+    result.startDate = new Date(temporal.startDate);
+    if (isNaN(result.startDate.getTime())) {
+      result.isValid = false;
+      result.validationErrors.push('Invalid startDate format');
+    }
+  }
+  
+  if (temporal.endDate) {
+    result.endDate = new Date(temporal.endDate);
+    if (isNaN(result.endDate.getTime())) {
+      result.isValid = false;
+      result.validationErrors.push('Invalid endDate format');
+    }
+  }
+  
+  // Handle durationDays
+  if (temporal.durationDays && result.startDate && !result.endDate) {
+    result.endDate = new Date(result.startDate.getTime() + temporal.durationDays * 24 * 60 * 60 * 1000);
+  }
+  
+  // Validate date relationship
+  if (result.startDate && result.endDate && result.startDate >= result.endDate) {
+    result.isValid = false;
+    result.validationErrors.push('startDate must be before endDate');
+  }
+  
+  return result;
+}
+
+function calculateTemporalOverlap(
+  scope1: { startDate?: Date; endDate?: Date },
+  scope2: { startDate?: Date; endDate?: Date }
+): { start: Date; end: Date } | null {
+  // If either scope is perpetual (no end date), they overlap if they have any time intersection
+  const start1 = scope1.startDate || new Date(0);
+  const end1 = scope1.endDate || new Date(9999, 11, 31);
+  const start2 = scope2.startDate || new Date(0);
+  const end2 = scope2.endDate || new Date(9999, 11, 31);
+  
+  const overlapStart = new Date(Math.max(start1.getTime(), start2.getTime()));
+  const overlapEnd = new Date(Math.min(end1.getTime(), end2.getTime()));
+  
+  if (overlapStart < overlapEnd) {
+    return { start: overlapStart, end: overlapEnd };
+  }
+  
+  return null;
 }
 
 function generateImplementationGuidance(

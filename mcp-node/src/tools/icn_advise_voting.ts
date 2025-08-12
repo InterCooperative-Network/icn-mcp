@@ -83,58 +83,59 @@ export interface ManipulationVector {
   detectionMethods: string[];
 }
 
-export interface VotingAdviceResponse {
-  /** Scenario analysis */
-  scenarioAnalysis: {
-    /** Key challenges identified */
-    keyChallenges: string[];
-    /** Critical success factors */
-    criticalSuccessFactors: string[];
-    /** Risk assessment */
-    riskLevel: 'low' | 'medium' | 'high';
+export interface VotingAdvice {
+  primary: {
+    mechanism: 'quadratic' | 'ranked_choice' | 'approval' | 'consensus' | 'hybrid' | 'sortition' | 'simple_majority' | 'supermajority';
+    params: Record<string, unknown>;
   };
-  /** Recommended voting mechanism */
-  recommendation: {
-    /** Primary recommendation */
-    primary: VotingMechanismOption;
-    /** Alternative options */
-    alternatives: VotingMechanismOption[];
-    /** Hybrid approach (if applicable) */
-    hybrid?: {
-      description: string;
-      phases: Array<{
-        phase: string;
-        mechanism: string;
-        rationale: string;
-      }>;
-    };
-  };
-  /** Trade-off analysis */
-  tradeOffs: {
-    /** Key trade-offs to consider */
-    considerations: Array<{
-      aspect: string;
-      options: string[];
-      recommendation: string;
-      rationale: string;
-    }>;
-    /** Optimization suggestions */
-    optimizations: string[];
-  };
-  /** Manipulation warnings */
-  manipulationWarnings: ManipulationVector[];
-  /** Implementation guidance */
-  implementation: {
-    /** Setup requirements */
-    setupRequirements: string[];
-    /** Timeline estimate */
-    timelineEstimate: number;
-    /** Resource allocation */
-    resourceAllocation: Record<string, number>;
-    /** Success monitoring */
-    monitoringMetrics: string[];
-  };
+  alternatives: Array<{ mechanism: string; params: Record<string, unknown>; whenPreferable: string }>;
+  tradeoffs: string[]; // participation vs expertise, speed vs deliberation, etc.
+  risks: string[];     // e.g., identity manipulation, vote buying, delegation capture
+  manipulationVectors: string[];
+  requiredResources: { engineeringDays: number; opsHours: number; infraNotes: string[] };
+  timelineEstimateDays: number;
+  rationale: string[];
+  confidence: number; // 0..1
 }
+
+export interface DelegationGraph {
+  /** Delegation relationships */
+  delegations: Array<{
+    from: string;
+    to: string;
+    weight?: number;
+  }>;
+  /** Delegation chains */
+  chains: Array<{
+    chain: string[];
+    length: number;
+    totalWeight: number;
+  }>;
+  /** Power concentration metrics */
+  concentration: {
+    /** In-degree distribution */
+    inDegree: Record<string, number>;
+    /** PageRank-style centrality */
+    centrality: Record<string, number>;
+    /** Gini coefficient of power distribution */
+    giniCoefficient: number;
+  };
+  /** Cycle detection */
+  cycles: Array<{
+    participants: string[];
+    cycleType: 'direct' | 'indirect';
+  }>;
+  /** Warnings */
+  warnings: Array<{
+    type: 'excessive_depth' | 'cycle_detected' | 'power_concentration';
+    severity: 'low' | 'medium' | 'high';
+    description: string;
+    affectedParticipants: string[];
+  }>;
+}
+
+const MAX_DELEGATION_DEPTH = 5;
+const CONCENTRATION_THRESHOLD = 2; // Standard deviations above mean
 
 /**
  * Analyze governance scenarios and recommend optimal voting mechanisms
@@ -142,7 +143,7 @@ export interface VotingAdviceResponse {
 export async function icnAdviseVoting(
   scenario: GovernanceScenario, 
   goals: VotingGoals
-): Promise<VotingAdviceResponse> {
+): Promise<VotingAdvice> {
   // Analyze the scenario context
   const scenarioAnalysis = analyzeScenario(scenario);
   
@@ -158,16 +159,324 @@ export async function icnAdviseVoting(
   // Identify manipulation vectors
   const manipulationWarnings = identifyManipulationVectors(recommendation.primary, scenario);
   
+  // Perform delegation analysis if liquid democracy is involved
+  let delegationAnalysis;
+  if (recommendation.primary.type === 'liquid' || 
+      mechanismOptions.some(option => option.type === 'liquid')) {
+    delegationAnalysis = analyzeDelegationGraph(scenario);
+  }
+  
   // Generate implementation guidance
   const implementation = generateImplementationGuidance(recommendation.primary, scenario);
   
+  // Convert to new VotingAdvice format
   return {
-    scenarioAnalysis,
-    recommendation,
-    tradeOffs,
-    manipulationWarnings,
-    implementation
+    primary: {
+      mechanism: mapMechanismType(recommendation.primary.type),
+      params: recommendation.primary.parameters || {}
+    },
+    alternatives: recommendation.alternatives.map(alt => ({
+      mechanism: alt.type,
+      params: alt.parameters || {},
+      whenPreferable: `Better when: ${alt.strengths.slice(0, 2).join(', ')}`
+    })),
+    tradeoffs: tradeOffs.considerations.map(c => `${c.aspect}: ${c.rationale}`),
+    risks: scenarioAnalysis.keyChallenges,
+    manipulationVectors: manipulationWarnings.map(w => w.name),
+    requiredResources: {
+      engineeringDays: Math.ceil(implementation.timelineEstimate * 0.6),
+      opsHours: Math.ceil(implementation.timelineEstimate * 8),
+      infraNotes: implementation.setupRequirements
+    },
+    timelineEstimateDays: implementation.timelineEstimate,
+    rationale: [
+      `Selected ${recommendation.primary.name} based on scenario requirements`,
+      `Suitability score: ${recommendation.primary.suitabilityScore.toFixed(2)}`,
+      ...delegationAnalysis?.warnings.map(w => w.description) || []
+    ],
+    confidence: recommendation.primary.suitabilityScore
   };
+}
+
+function mapMechanismType(type: string): VotingAdvice['primary']['mechanism'] {
+  switch (type) {
+    case 'direct': return 'simple_majority';
+    case 'quadratic': return 'quadratic';
+    case 'ranked_choice': return 'ranked_choice';
+    case 'consensus': return 'consensus';
+    case 'liquid': return 'hybrid';
+    case 'sortition': return 'sortition';
+    default: return 'simple_majority';
+  }
+}
+
+function analyzeDelegationGraph(scenario: GovernanceScenario): DelegationGraph {
+  // Simulate delegation relationships based on scenario
+  const participants = Array.from({ length: scenario.participantCount }, (_, i) => `participant_${i}`);
+  const delegations = generateSimulatedDelegations(participants, scenario);
+  
+  // Build delegation chains
+  const chains = buildDelegationChains(delegations);
+  
+  // Calculate power concentration
+  const concentration = calculatePowerConcentration(delegations, participants);
+  
+  // Detect cycles
+  const cycles = detectDelegationCycles(delegations);
+  
+  // Generate warnings
+  const warnings = generateDelegationWarnings(chains, concentration, cycles);
+  
+  return {
+    delegations,
+    chains,
+    concentration,
+    cycles,
+    warnings
+  };
+}
+
+function generateSimulatedDelegations(
+  participants: string[], 
+  scenario: GovernanceScenario
+): DelegationGraph['delegations'] {
+  const delegations: DelegationGraph['delegations'] = [];
+  
+  // Simulate delegation patterns based on trust network
+  const delegationRate = scenario.participants.trustNetwork === 'high_trust' ? 0.4 :
+                        scenario.participants.trustNetwork === 'moderate_trust' ? 0.2 : 0.1;
+  
+  for (let i = 0; i < participants.length; i++) {
+    if (Math.random() < delegationRate) {
+      // Delegate to someone with higher index (simulating expertise delegation)
+      const possibleDelegates = participants.slice(i + 1);
+      if (possibleDelegates.length > 0) {
+        const delegateTo = possibleDelegates[Math.floor(Math.random() * possibleDelegates.length)];
+        delegations.push({
+          from: participants[i],
+          to: delegateTo,
+          weight: 1
+        });
+      }
+    }
+  }
+  
+  return delegations;
+}
+
+function buildDelegationChains(delegations: DelegationGraph['delegations']): DelegationGraph['chains'] {
+  const delegationMap = new Map<string, string>();
+  
+  // Build delegation mapping
+  for (const delegation of delegations) {
+    delegationMap.set(delegation.from, delegation.to);
+  }
+  
+  const chains: DelegationGraph['chains'] = [];
+  const visited = new Set<string>();
+  
+  // Find all delegation chains
+  for (const delegation of delegations) {
+    if (visited.has(delegation.from)) continue;
+    
+    const chain = [delegation.from];
+    let current = delegation.from;
+    let totalWeight = 0;
+    
+    // Follow the chain
+    while (delegationMap.has(current) && chain.length < MAX_DELEGATION_DEPTH) {
+      const next = delegationMap.get(current)!;
+      
+      // Check for cycles
+      if (chain.includes(next)) {
+        break;
+      }
+      
+      chain.push(next);
+      current = next;
+      totalWeight += delegation.weight || 1;
+      
+      if (chain.length >= MAX_DELEGATION_DEPTH) {
+        break;
+      }
+    }
+    
+    if (chain.length > 1) {
+      chains.push({
+        chain,
+        length: chain.length,
+        totalWeight
+      });
+      
+      // Mark all participants in chain as visited
+      chain.forEach(participant => visited.add(participant));
+    }
+  }
+  
+  return chains;
+}
+
+function calculatePowerConcentration(
+  delegations: DelegationGraph['delegations'],
+  participants: string[]
+): DelegationGraph['concentration'] {
+  const inDegree: Record<string, number> = {};
+  const centrality: Record<string, number> = {};
+  
+  // Initialize
+  participants.forEach(p => {
+    inDegree[p] = 0;
+    centrality[p] = 1;
+  });
+  
+  // Calculate in-degree (direct delegations)
+  delegations.forEach(delegation => {
+    inDegree[delegation.to] += delegation.weight || 1;
+  });
+  
+  // Simple PageRank-style centrality calculation
+  for (let iter = 0; iter < 10; iter++) {
+    const newCentrality: Record<string, number> = {};
+    
+    participants.forEach(p => {
+      newCentrality[p] = 0.15; // Damping factor
+    });
+    
+    delegations.forEach(delegation => {
+      const weight = delegation.weight || 1;
+      newCentrality[delegation.to] += 0.85 * centrality[delegation.from] * weight;
+    });
+    
+    Object.assign(centrality, newCentrality);
+  }
+  
+  // Calculate Gini coefficient
+  const centralityValues = Object.values(centrality);
+  const giniCoefficient = calculateGiniCoefficient(centralityValues);
+  
+  return {
+    inDegree,
+    centrality,
+    giniCoefficient
+  };
+}
+
+function detectDelegationCycles(delegations: DelegationGraph['delegations']): DelegationGraph['cycles'] {
+  const delegationMap = new Map<string, string>();
+  const cycles: DelegationGraph['cycles'] = [];
+  
+  // Build delegation mapping
+  for (const delegation of delegations) {
+    delegationMap.set(delegation.from, delegation.to);
+  }
+  
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+  
+  function dfs(node: string, path: string[]): boolean {
+    if (recursionStack.has(node)) {
+      // Found a cycle
+      const cycleStart = path.indexOf(node);
+      const cycle = path.slice(cycleStart);
+      cycles.push({
+        participants: cycle,
+        cycleType: cycle.length === 2 ? 'direct' : 'indirect'
+      });
+      return true;
+    }
+    
+    if (visited.has(node)) {
+      return false;
+    }
+    
+    visited.add(node);
+    recursionStack.add(node);
+    path.push(node);
+    
+    const next = delegationMap.get(node);
+    if (next) {
+      dfs(next, [...path]);
+    }
+    
+    recursionStack.delete(node);
+    return false;
+  }
+  
+  // Check each node for cycles
+  for (const [from] of delegationMap) {
+    if (!visited.has(from)) {
+      dfs(from, []);
+    }
+  }
+  
+  return cycles;
+}
+
+function generateDelegationWarnings(
+  chains: DelegationGraph['chains'],
+  concentration: DelegationGraph['concentration'],
+  cycles: DelegationGraph['cycles']
+): DelegationGraph['warnings'] {
+  const warnings: DelegationGraph['warnings'] = [];
+  
+  // Check for excessive chain depth
+  const longChains = chains.filter(chain => chain.length >= MAX_DELEGATION_DEPTH);
+  if (longChains.length > 0) {
+    warnings.push({
+      type: 'excessive_depth',
+      severity: 'medium',
+      description: `${longChains.length} delegation chains exceed maximum depth of ${MAX_DELEGATION_DEPTH}`,
+      affectedParticipants: longChains.flatMap(chain => chain.chain)
+    });
+  }
+  
+  // Check for cycles
+  if (cycles.length > 0) {
+    warnings.push({
+      type: 'cycle_detected',
+      severity: 'high',
+      description: `${cycles.length} delegation cycles detected, which can cause infinite loops`,
+      affectedParticipants: cycles.flatMap(cycle => cycle.participants)
+    });
+  }
+  
+  // Check for power concentration
+  const centralityValues = Object.values(concentration.centrality);
+  const mean = centralityValues.reduce((sum, val) => sum + val, 0) / centralityValues.length;
+  const stdDev = Math.sqrt(centralityValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / centralityValues.length);
+  const threshold = mean + CONCENTRATION_THRESHOLD * stdDev;
+  
+  const highCentralityNodes = Object.entries(concentration.centrality)
+    .filter(([, centrality]) => centrality > threshold)
+    .map(([node]) => node);
+  
+  if (highCentralityNodes.length > 0) {
+    warnings.push({
+      type: 'power_concentration',
+      severity: 'medium',
+      description: `${highCentralityNodes.length} participants have disproportionately high delegation power`,
+      affectedParticipants: highCentralityNodes
+    });
+  }
+  
+  return warnings;
+}
+
+function calculateGiniCoefficient(values: number[]): number {
+  if (values.length === 0) return 0;
+  
+  const sortedValues = [...values].sort((a, b) => a - b);
+  const n = sortedValues.length;
+  const sum = sortedValues.reduce((a, b) => a + b, 0);
+  
+  if (sum === 0) return 0;
+  
+  let gini = 0;
+  for (let i = 0; i < n; i++) {
+    gini += (2 * (i + 1) - n - 1) * sortedValues[i];
+  }
+  
+  return gini / (n * sum);
 }
 
 function analyzeScenario(scenario: GovernanceScenario) {
@@ -656,6 +965,20 @@ function identifyManipulationVectors(
       mitigations: ['Delegation caps', 'Transparent delegation tracking', 'Regular re-delegation'],
       detectionMethods: ['Delegation concentration metrics', 'Network analysis', 'Power distribution tracking']
     });
+    
+    // Add specific warnings for high concentration
+    const delegationAnalysis = analyzeDelegationGraph(scenario);
+    if (delegationAnalysis.warnings.some(w => w.type === 'power_concentration')) {
+      vectors.push({
+        name: 'Power Concentration Risk',
+        severity: 'high',
+        description: 'Simulated delegation patterns show high power concentration risk',
+        enablingConditions: ['Trust network asymmetries', 'Expertise disparities'],
+        impact: 'Small group controlling majority of delegated votes',
+        mitigations: ['Implement delegation caps', 'Promote delegation diversity', 'Regular redistribution'],
+        detectionMethods: ['Centrality analysis', 'Gini coefficient monitoring']
+      });
+    }
   }
   
   // Strategic nomination
