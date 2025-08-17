@@ -88,6 +88,7 @@ describe('ICN Tools', () => {
     it('should return task context', async () => {
       const result = await icnGetTaskContext({ taskId: 'test-task' });
       
+      // Existing fields
       expect(result).toHaveProperty('task');
       expect(result).toHaveProperty('repo');
       expect(result).toHaveProperty('policy');
@@ -95,9 +96,40 @@ describe('ICN Tools', () => {
       expect(result).toHaveProperty('conventions');
       expect(result).toHaveProperty('starter_files');
       
+      // New enhanced fields
+      expect(result).toHaveProperty('summary');
+      expect(result).toHaveProperty('current_state');
+      expect(result).toHaveProperty('dependencies');
+      expect(result).toHaveProperty('relevant_protocols');
+      expect(result).toHaveProperty('architecture');
+      expect(result).toHaveProperty('invariants');
+      expect(result).toHaveProperty('acceptance_tests');
+      
       expect(result.task.id).toBe('test-task');
       expect(Array.isArray(result.steps)).toBe(true);
       expect(Array.isArray(result.starter_files)).toBe(true);
+      expect(Array.isArray(result.dependencies)).toBe(true);
+      expect(Array.isArray(result.relevant_protocols)).toBe(true);
+      expect(Array.isArray(result.architecture)).toBe(true);
+      expect(Array.isArray(result.invariants)).toBe(true);
+      expect(Array.isArray(result.acceptance_tests)).toBe(true);
+      expect(typeof result.summary).toBe('string');
+      expect(typeof result.current_state).toBe('string');
+      
+      // Verify architecture sections have expected structure
+      if (result.architecture.length > 0) {
+        const arch = result.architecture[0];
+        expect(arch).toHaveProperty('title');
+        expect(arch).toHaveProperty('path');
+        expect(arch).toHaveProperty('content');
+      }
+      
+      // Verify invariants have expected structure
+      if (result.invariants.length > 0) {
+        const inv = result.invariants[0];
+        expect(inv).toHaveProperty('id');
+        expect(inv).toHaveProperty('statement');
+      }
     });
   });
 
