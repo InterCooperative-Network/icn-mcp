@@ -141,7 +141,7 @@ function applyMigrations(db: Database.Database) {
 }
 
 // Concurrency-safe database operation wrapper
-async function withLock<T>(lockKey: string, operation: () => T): Promise<T> {
+export async function withLock<T>(lockKey: string, operation: () => T): Promise<T> {
   // Wait for any existing operation with the same lock key
   const existingLock = operationLocks.get(lockKey);
   if (existingLock) {
@@ -452,7 +452,7 @@ export function createBackup(backupPath?: string): string {
   }
   
   // Use SQLite backup API for consistent backup
-  const backup = db.backup(finalBackupPath);
+  db.backup(finalBackupPath);
   
   console.log(`Database backup created: ${finalBackupPath}`);
   return finalBackupPath;
