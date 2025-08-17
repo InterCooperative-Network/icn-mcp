@@ -24,6 +24,35 @@ export async function healthRoute(f: FastifyInstance) {
       environment: process.env.NODE_ENV || 'development'
     }
   }));
+  
+  f.get('/healthz/db', async () => {
+    try {
+      const start = Date.now();
+      const { getDatabaseInfo } = await import('@/db');
+      
+      // Test database connectivity with a simple query
+      const info = getDatabaseInfo();
+      const latency = Date.now() - start;
+      
+      return {
+        ok: true,
+        latency_ms: latency,
+        database: {
+          path: info.path,
+          size_bytes: info.size,
+          tables: info.tables,
+          last_migration: info.migrations[info.migrations.length - 1]?.version || null,
+          total_migrations: info.migrations.length
+        }
+      };
+    } catch (error) {
+      f.log.error({ error }, 'Database health check failed');
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Unknown database error'
+      };
+    }
+  });
 }
 
 const AgentRegister = z.object({

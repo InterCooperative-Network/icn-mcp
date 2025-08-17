@@ -64,9 +64,21 @@ const db = getDb();
 ```typescript
 import { createBackup } from './db';
 
-// Create timestamped backup
-const backupPath = createBackup();
+// Create timestamped backup (async to avoid blocking)
+const backupPath = await createBackup();
 console.log(`Backup created: ${backupPath}`);
+```
+
+### CLI Backup Script
+```bash
+# Create backup using CLI script (recommended for production)
+npx tsx scripts/backup-db.ts
+
+# Create backup to specific location
+npx tsx scripts/backup-db.ts ./backups/manual-backup.sqlite
+
+# Schedule with cron (example)
+# 0 2 * * * cd /path/to/mcp-server && npx tsx scripts/backup-db.ts
 ```
 
 ### Database Information
@@ -96,6 +108,26 @@ await withLock('task-processing', async () => {
 3. **Monitoring**: Use `getDatabaseInfo()` for operational monitoring
 4. **Disk Space**: Monitor database size growth and plan for capacity
 5. **Connection Limits**: SQLite handles multiple readers but single writer effectively
+
+## Concurrency Model
+
+### Single-Process Deployment (Default)
+- **In-Memory Locks**: `withLock()` function provides adequate concurrency control
+- **Write Transactions**: `withWriteTransaction()` uses `BEGIN IMMEDIATE` for database-level locking
+- **Transaction Retry**: Automatic retry with exponential backoff for busy database scenarios
+- **Recommended For**: Single instance deployments, development, and small production workloads
+
+### Multi-Process Deployment Considerations
+- **Database-Level Locking**: All write operations use `BEGIN IMMEDIATE` transactions for process-safe serialization
+- **WAL Mode Benefits**: Multiple readers can operate concurrently with single writer
+- **In-Memory Lock Limitation**: `withLock()` only works within a single process
+- **Advisory Locks**: For coarse-grained locking across processes, implement database advisory lock table
+
+### Scaling Notes
+- **Horizontal Scaling**: Requires database-level coordination (BEGIN IMMEDIATE already implemented)
+- **Process Coordination**: Multiple MCP instances can safely share the same database
+- **Lock Contention**: Monitor database busy timeouts and adjust `busy_timeout` pragma if needed
+- **Backup Coordination**: Use the async `createBackup()` CLI script to avoid blocking operations
 
 ## Migration Management
 

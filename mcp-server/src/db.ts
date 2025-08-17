@@ -115,7 +115,10 @@ function applyMigrations(db: Database.Database) {
         // Verify checksum for integrity
         const existingChecksum = appliedMigrations.get(version);
         if (existingChecksum !== checksum) {
-          console.warn(`Migration ${version} checksum mismatch. Expected: ${existingChecksum}, Got: ${checksum}`);
+          throw new Error(
+            `Migration ${version} checksum mismatch. Expected: ${existingChecksum}, Got: ${checksum}. ` +
+            `Database migration integrity cannot be guaranteed. Manual intervention required.`
+          );
         }
         continue;
       }
@@ -160,8 +163,20 @@ export async function withLock<T>(lockKey: string, operation: () => T): Promise<
   }
 }
 
-// Database transaction wrapper with retry logic
-function withTransaction<T>(db: Database.Database, operation: () => T, maxRetries = 3): T {
+// Helper function for async sleep to avoid blocking event loop
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Database-level write transaction wrapper using BEGIN IMMEDIATE for concurrency safety
+function withWriteTransaction<T>(db: Database.Database, operation: () => T): T {
+  // Use BEGIN IMMEDIATE to acquire write lock immediately
+  // This provides database-level concurrency control across processes
+  return db.transaction(operation).immediate();
+}
+
+// Database transaction wrapper with retry logic (exported for potential future use)
+export async function withTransaction<T>(db: Database.Database, operation: () => T, maxRetries = 3): Promise<T> {
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -174,10 +189,7 @@ function withTransaction<T>(db: Database.Database, operation: () => T, maxRetrie
       if (lastError.message.includes('SQLITE_BUSY') && attempt < maxRetries) {
         // Exponential backoff: 50ms, 100ms, 200ms
         const delay = 50 * Math.pow(2, attempt);
-        const start = Date.now();
-        while (Date.now() - start < delay) {
-          // Busy wait - in real production, you might use setTimeout with await
-        }
+        await sleep(delay);
         continue;
       }
       
@@ -197,11 +209,14 @@ function generateId(prefix: string): string {
 export function insertTask(input: InsertTaskInput): { id: string } {
   const db = getDb();
   const id = generateId('task');
-  const stmt = db.prepare(
-    "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
-  );
-  stmt.run(id, input.title, input.description ?? null, 'open', input.created_by ?? null);
-  return { id };
+  
+  return withWriteTransaction(db, () => {
+    const stmt = db.prepare(
+      "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
+    );
+    stmt.run(id, input.title, input.description ?? null, 'open', input.created_by ?? null);
+    return { id };
+  });
 }
 
 export function listTasks(): TaskRow[] {
@@ -249,9 +264,12 @@ export function insertAgent(input: { id?: string; name: string; kind: string; to
   const db = getDb();
   const id = input.id ?? generateId('agent');
   const expiresInHours = input.expiresInHours ?? 24; // Default 24 hours
-  db.prepare('INSERT INTO agents (id, name, kind, token, expires_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'+\' || ? || \' hours\'))')
-    .run(id, input.name, input.kind, input.token, expiresInHours);
-  return { id, token: input.token };
+  
+  return withWriteTransaction(db, () => {
+    db.prepare('INSERT INTO agents (id, name, kind, token, expires_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'+\' || ? || \' hours\'))')
+      .run(id, input.name, input.kind, input.token, expiresInHours);
+    return { id, token: input.token };
+  });
 }
 
 export function getAgentByToken(token: string): AgentRow | null {
@@ -275,7 +293,8 @@ export function countAgents(): number {
 export function insertAgentBootstrap(input: { name: string; kind: string; token: string; expiresInHours?: number }): { id: string; token: string } | null {
   const db = getDb();
   
-  return withTransaction(db, () => {
+  // Use write transaction with immediate lock for concurrency safety
+  return withWriteTransaction(db, () => {
     // Check if any agents exist (double-check inside transaction)
     const existingCount = db.prepare('SELECT COUNT(1) as c FROM agents WHERE expires_at IS NULL OR expires_at > datetime(\'now\')').get() as { c?: number };
     if (Number(existingCount?.c ?? 0) > 0) {
@@ -339,7 +358,8 @@ export function getAvailableTask(): TaskRow | null {
 export function claimTask(taskId: string, agentId: string): boolean {
   const db = getDb();
   
-  return withTransaction(db, () => {
+  // Use write transaction with immediate lock for concurrency safety
+  return withWriteTransaction(db, () => {
     // First check if task is still available
     const task = db.prepare('SELECT id FROM tasks WHERE id = ? AND status = \'open\'').get(taskId);
     if (!task) return false;
@@ -441,7 +461,7 @@ export function insertWebhookEvent(input: InsertWebhookEventInput): { id: string
 }
 
 // Database backup and recovery functions
-export function createBackup(backupPath?: string): string {
+export async function createBackup(backupPath?: string): Promise<string> {
   const db = getDb();
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const finalBackupPath = backupPath || path.resolve(process.cwd(), `../var/backup-${timestamp}.sqlite`);
@@ -451,8 +471,22 @@ export function createBackup(backupPath?: string): string {
     fs.mkdirSync(backupDir, { recursive: true });
   }
   
-  // Use SQLite backup API for consistent backup
-  db.backup(finalBackupPath);
+  // Use SQLite backup API wrapped in Promise to avoid blocking event loop
+  await new Promise<void>((resolve, reject) => {
+    try {
+      db.backup(finalBackupPath);
+      // Add a small delay to ensure file is written to disk
+      setTimeout(() => {
+        if (fs.existsSync(finalBackupPath)) {
+          resolve();
+        } else {
+          reject(new Error(`Backup file was not created: ${finalBackupPath}`));
+        }
+      }, 100);
+    } catch (error) {
+      reject(error);
+    }
+  });
   
   console.log(`Database backup created: ${finalBackupPath}`);
   return finalBackupPath;
