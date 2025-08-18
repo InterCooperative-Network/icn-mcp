@@ -208,26 +208,15 @@ function generateId(prefix: string): string {
 
 export function insertTask(input: InsertTaskInput): { id: string } {
   const db = getDb();
-  const id = input.id || generateId('task');
+  
+  // Force use the provided ID if it exists  
+  const id = input.id ? input.id : generateId('task');
   
   return withWriteTransaction(db, () => {
     const stmt = db.prepare(
       "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
     );
     stmt.run(id, input.title, input.description ?? null, 'open', input.created_by ?? null);
-    return { id };
-  });
-}
-
-// Create a separate task creation function that accepts custom ID for webhooks
-export function insertTaskWithCustomId(id: string, title: string, description: string, createdBy: string): { id: string } {
-  const db = getDb();
-  
-  return withWriteTransaction(db, () => {
-    const stmt = db.prepare(
-      "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
-    );
-    stmt.run(id, title, description, 'open', createdBy);
     return { id };
   });
 }
