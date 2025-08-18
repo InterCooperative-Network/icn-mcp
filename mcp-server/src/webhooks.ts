@@ -29,13 +29,11 @@ function extractTaskId(payload: any): string | undefined {
       // Use safer regex: /(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/
       const match = body.match(/(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/);
       if (match) {
-        console.log(`Found Task-ID: ${match[2]} in body: ${body.substring(0, 100)}...`);
         return match[2]; // Return the second capture group (the actual task ID)
       }
     }
   }
   
-  console.log('No Task-ID found in payload bodies:', possibleBodies);
   return undefined;
 }
 
@@ -102,12 +100,10 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
   }
 
   // Minimal routing skeleton (extend in future phases)
-  console.log(`Processing webhook event: ${event}, taskId: ${taskId}, action: ${action}`);
   switch (event) {
     case 'issues':
     case 'issue_comment':
     case 'pull_request': {
-      console.log(`Handling ${event} event`);
       try {
         const analysis = analyzePr(payload as any);
         if (analysis.advice.length > 0) {
@@ -116,39 +112,26 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
         
         // Create task if Task-ID is found and task doesn't exist
         if (taskId) {
-          console.log(`Found taskId: ${taskId}, checking if exists`);
           req.log.info({ taskId, reqId: req.id, event, action }, 'found Task-ID in webhook');
           const existingTask = getTaskById(taskId);
-          console.log(`Existing task: ${existingTask ? 'found' : 'not found'}`);
           if (!existingTask) {
-            console.log(`Creating new task with ID: ${taskId}`);
             req.log.info({ taskId, reqId: req.id }, 'creating new task from webhook');
             // Create new task based on webhook payload
-            console.log(`Generating title for event: ${event}, action: ${action}`);
             const title = generateTaskTitle(event, action, payload);
-            console.log(`Generated title: ${title}`);
             const description = generateTaskDescription(event, payload);
-            console.log(`Generated description length: ${description.length}`);
             const createdBy = senderLogin || 'webhook';
-            console.log(`About to call insertTask with ID: ${taskId}`);
-            console.log(`Input object:`, { id: taskId, title, description, created_by: createdBy });
             
             const { id } = insertTask({ id: taskId, title, description, created_by: createdBy });
-            console.log(`Task created successfully with ID: ${id}`);
             req.log.info({ taskId: id, reqId: req.id, event, action }, 'task created from webhook');
             
             // Post initial status/comment for task creation
-            // await postTaskCreationResponse(event, payload, id, req);
+            await postTaskCreationResponse(event, payload, id, req);
           } else {
             req.log.info({ taskId, reqId: req.id, event, action }, 'task already exists, skipping creation');
           }
-        } else {
-          console.log(`No taskId found in event: ${event}`);
-          req.log.info({ reqId: req.id, event, action }, 'no Task-ID found in webhook payload');
         }
       } catch (err) {
-        console.log(`Error in ${event} handler: ${err}`);
-        req.log.error({ err, reqId: req.id }, 'pr coaching error');
+        req.log.error({ err, reqId: req.id }, 'webhook event processing error');
       }
       break;
     }

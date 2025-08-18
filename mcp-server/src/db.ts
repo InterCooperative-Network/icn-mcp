@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 const defaultDbPath = path.resolve(process.cwd(), '../var/icn-mcp.sqlite');
 const MIGRATIONS_DIR = path.resolve(process.cwd(), '../db/migrations');
 
-export type InsertTaskInput = { title: string; description?: string; created_by?: string };
+export type InsertTaskInput = { title: string; description?: string; created_by?: string; id?: string };
 export type TaskRow = { id: string; title: string; description: string | null; status: string; created_at: string };
 export type InsertRunInput = { task_id: string; agent: string; status: string; notes?: string };
 export type InsertArtifactInput = { task_id: string; kind: string; path: string; meta?: unknown };
@@ -206,27 +206,34 @@ function generateId(prefix: string): string {
   return `${prefix}_${now}_${rand}`;
 }
 
-export function insertTask(input: InsertTaskInput & { id?: string }): { id: string } {
+export function insertTask(input: InsertTaskInput): { id: string } {
   const db = getDb();
+  console.log('insertTask input:', input);
+  console.log('input.id:', input.id);
+  console.log('typeof input.id:', typeof input.id);
   const id = input.id || generateId('task');
-  
-  console.log(`insertTask called with input:`, input);
-  console.log(`Using ID: ${id} (input.id was: ${input.id})`);
+  console.log('final id:', id);
   
   return withWriteTransaction(db, () => {
     const stmt = db.prepare(
       "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
     );
-    console.log(`Running SQL: INSERT INTO tasks with values: ${id}, ${input.title}, ${input.description}, open, ${input.created_by}`);
     stmt.run(id, input.title, input.description ?? null, 'open', input.created_by ?? null);
-    console.log(`Task inserted successfully with ID: ${id}`);
     return { id };
   });
 }
 
-// Keep the explicit version for clarity
-export function insertTaskWithId(input: InsertTaskInput & { id: string }): { id: string } {
-  return insertTask(input);
+// Create a separate task creation function that accepts custom ID for webhooks
+export function insertTaskWithCustomId(id: string, title: string, description: string, createdBy: string): { id: string } {
+  const db = getDb();
+  
+  return withWriteTransaction(db, () => {
+    const stmt = db.prepare(
+      "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
+    );
+    stmt.run(id, title, description, 'open', createdBy);
+    return { id };
+  });
 }
 
 export function listTasks(): TaskRow[] {
