@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { healthRoute, apiRoutes } from './api.js';
 import { metricsRoute } from './metrics.js';
+import { rateLimitMiddleware } from './auth.js';
 
 // Configure pino logger
 const isDev = process.env.NODE_ENV !== 'production';
@@ -52,6 +53,17 @@ declare module 'fastify' {
     rawBody?: Buffer;
   }
 }
+
+// Add global rate limiting (except for health checks)
+app.addHook('preHandler', async (req, reply) => {
+  // Skip rate limiting for health checks
+  if (req.url.startsWith('/healthz')) {
+    return;
+  }
+  
+  // Apply rate limiting
+  await rateLimitMiddleware()(req, reply);
+});
 
 app.register(healthRoute);
 app.register(apiRoutes, { prefix: '/api' });
