@@ -47,14 +47,14 @@ function parseUnifiedDiff(diffContent) {
   for (const line of lines) {
     // Match --- a/path or --- path
     const sourceMatch = line.match(/^--- (?:a\/)?(.+)$/);
-    if (sourceMatch && !sourceMatch[1].includes('/dev/null')) {
+    if (sourceMatch && sourceMatch[1] !== '/dev/null') {
       changedPaths.add(sourceMatch[1]);
       continue;
     }
     
     // Match +++ b/path or +++ path
     const targetMatch = line.match(/^\+\+\+ (?:b\/)?(.+)$/);
-    if (targetMatch && !targetMatch[1].includes('/dev/null')) {
+    if (targetMatch && targetMatch[1] !== '/dev/null') {
       changedPaths.add(targetMatch[1]);
       continue;
     }
@@ -118,10 +118,12 @@ function readCodeowners() {
  */
 function matchGlob(glob, filePath) {
   // Convert glob pattern to regex
+  // Handle ** first, then *, to avoid conflicts
   let regex = glob
     .replace(/\./g, '\\.')
-    .replace(/\*\*/g, '.*')
-    .replace(/\*/g, '[^/]*')
+    .replace(/\*\*/g, '{{DOUBLE_STAR}}')  // Temporarily replace ** to avoid conflicts
+    .replace(/\*/g, '[^/]*')              // Replace single * with [^/]*
+    .replace(/\{\{DOUBLE_STAR\}\}/g, '.*') // Replace ** with .*
     .replace(/\?/g, '[^/]');
   
   regex = `^${regex}$`;
@@ -185,11 +187,27 @@ function checkPolicy(actor, changedPaths, rules, codeowners) {
 }
 
 /**
- * Get git diff output
+ * Get git diff output with support for different modes
+ * @param {string} mode - 'unstaged', 'staged', or ref name
  */
-function getGitDiff(ref = 'HEAD') {
+function getGitDiff(mode = 'unstaged') {
   return new Promise((resolve, reject) => {
-    const git = spawn('git', ['diff', '--name-only', ref], { 
+    let gitArgs;
+    
+    switch (mode) {
+      case 'unstaged':
+        gitArgs = ['diff', '--name-only'];
+        break;
+      case 'staged':
+        gitArgs = ['diff', '--name-only', '--cached'];
+        break;
+      default:
+        // Treat as ref
+        gitArgs = ['diff', '--name-only', mode];
+        break;
+    }
+    
+    const git = spawn('git', gitArgs, { 
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: process.cwd()
     });
@@ -220,15 +238,21 @@ Usage: node tools/policy-check.js [options]
 Options:
   --actor <name>      Actor/agent name to check (required)
   --diff <file>       Path to diff file (use - for stdin)
-  --git [ref]         Check git diff against ref (default: HEAD)
+  --git [mode|ref]    Check git diff (modes: unstaged, staged, or ref name)
+                      unstaged: working dir vs staged (default)
+                      staged: staged vs HEAD  
+                      ref: working dir vs ref
   --paths <paths>     Comma-separated list of file paths to check
   --help              Show this help message
 
 Examples:
-  # Check current git working directory changes
-  node tools/policy-check.js --actor architect --git
+  # Check current unstaged changes (working dir vs staged)
+  node tools/policy-check.js --actor architect --git unstaged
 
-  # Check git diff against main branch
+  # Check staged changes (staged vs HEAD)
+  node tools/policy-check.js --actor architect --git staged
+
+  # Check git diff against main branch  
   node tools/policy-check.js --actor planner --git main
 
   # Check specific paths
@@ -265,7 +289,7 @@ async function main() {
         break;
       case '--git':
         useGit = true;
-        gitRef = args[i + 1] && !args[i + 1].startsWith('--') ? args[++i] : 'HEAD';
+        gitRef = args[i + 1] && !args[i + 1].startsWith('--') ? args[++i] : 'unstaged';
         break;
       case '--paths':
         paths = args[++i].split(',').map(p => p.trim());

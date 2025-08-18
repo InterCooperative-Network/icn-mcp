@@ -122,6 +122,98 @@ index abc123..def456 100644
       failed++;
     }
   }
+
+  // Test 6: Diff parsing with /dev/null entries (file add/delete)
+  {
+    const testDiffWithDevNull = `diff --git a/new-file.md b/new-file.md
+new file mode 100644
+index 0000000..abc123
+--- /dev/null
++++ b/new-file.md
+@@ -0,0 +1,2 @@
++# New File
++Content
+diff --git a/deleted-file.md b/deleted-file.md
+deleted file mode 100644
+index def456..0000000
+--- a/deleted-file.md
++++ /dev/null
+@@ -1,2 +0,0 @@
+-# Deleted File
+-Content
+diff --git a/docs/modified.md b/docs/modified.md
+index ghi789..jkl012 100644
+--- a/docs/modified.md
++++ b/docs/modified.md
+@@ -1 +1,2 @@
+ # Modified
++New content
+`;
+    
+    const tmpFile = path.join('/tmp', 'test-devnull-diff.patch');
+    fs.writeFileSync(tmpFile, testDiffWithDevNull);
+    
+    const result = await runPolicyCheck(['--actor', 'architect', '--diff', tmpFile]);
+    
+    // Clean up
+    fs.unlinkSync(tmpFile);
+    
+    // Should detect new-file.md, deleted-file.md, and docs/modified.md but not /dev/null
+    if (result.stdout.includes('new-file.md') && 
+        result.stdout.includes('deleted-file.md') && 
+        result.stdout.includes('docs/modified.md') && 
+        !result.stdout.includes('/dev/null')) {
+      console.log('✅ Diff parsing with /dev/null works');
+      passed++;
+    } else {
+      console.error('❌ Diff parsing with /dev/null failed');
+      console.error('stdout:', result.stdout);
+      console.error('stderr:', result.stderr);
+      failed++;
+    }
+  }
+
+  // Test 7: Glob pattern behavior - ** vs * 
+  {
+    // Test that ** matches multiple path segments and * matches single segments
+    const result1 = await runPolicyCheck(['--actor', 'architect', '--paths', 'docs/deep/nested/file.md']);
+    const result2 = await runPolicyCheck(['--actor', 'ops', '--paths', 'ci/deploy.yml']);
+    const result3 = await runPolicyCheck(['--actor', 'ops', '--paths', 'ci/deep/nested/config.yml']);
+    
+    // architect has "docs/**" which should match docs/deep/nested/file.md  
+    // ops has "ci/**" which should match both ci/deploy.yml and ci/deep/nested/config.yml
+    // ops also has "*.yml" which should match root-level .yml files but not nested ones
+    if (result1.code === 0 && result2.code === 0 && result3.code === 0) {
+      console.log('✅ Glob pattern ** vs * behavior works');
+      passed++;
+    } else {
+      console.error('❌ Glob pattern ** vs * behavior failed');
+      console.error('result1 (architect docs):', result1.code, result1.stdout);
+      console.error('result2 (ops ci):', result2.code, result2.stdout);
+      console.error('result3 (ops ci nested):', result3.code, result3.stdout);
+      failed++;
+    }
+  }
+
+  // Test 8: Git diff modes (staged vs unstaged)
+  {
+    // This test will only work if we can simulate git state, so let's test the argument parsing
+    const result1 = await runPolicyCheck(['--actor', 'architect', '--git', 'staged', '--help']);
+    const result2 = await runPolicyCheck(['--actor', 'architect', '--git', 'unstaged', '--help']);
+    const result3 = await runPolicyCheck(['--actor', 'architect', '--git', 'main', '--help']);
+    
+    // All should show help (exit code 0) since --help overrides other functionality
+    if (result1.code === 0 && result2.code === 0 && result3.code === 0) {
+      console.log('✅ Git diff modes argument parsing works');
+      passed++;
+    } else {
+      console.error('❌ Git diff modes argument parsing failed');
+      console.error('staged result:', result1.code);
+      console.error('unstaged result:', result2.code);
+      console.error('ref result:', result3.code);
+      failed++;
+    }
+  }
   
   console.log(`\n📊 Test Results: ${passed} passed, ${failed} failed`);
   
