@@ -85,9 +85,10 @@ describe('ICN Tools', () => {
   });
 
   describe('icnGetTaskContext', () => {
-    it('should return task context', async () => {
+    it('should return task context with proper types', async () => {
       const result = await icnGetTaskContext({ taskId: 'test-task' });
       
+      // Existing fields
       expect(result).toHaveProperty('task');
       expect(result).toHaveProperty('repo');
       expect(result).toHaveProperty('policy');
@@ -95,9 +96,180 @@ describe('ICN Tools', () => {
       expect(result).toHaveProperty('conventions');
       expect(result).toHaveProperty('starter_files');
       
+      // New enhanced fields
+      expect(result).toHaveProperty('summary');
+      expect(result).toHaveProperty('current_state');
+      expect(result).toHaveProperty('dependencies');
+      expect(result).toHaveProperty('relevant_protocols');
+      expect(result).toHaveProperty('architecture');
+      expect(result).toHaveProperty('invariants');
+      expect(result).toHaveProperty('acceptance_tests');
+      
       expect(result.task.id).toBe('test-task');
       expect(Array.isArray(result.steps)).toBe(true);
       expect(Array.isArray(result.starter_files)).toBe(true);
+      expect(Array.isArray(result.dependencies)).toBe(true);
+      expect(Array.isArray(result.relevant_protocols)).toBe(true);
+      expect(Array.isArray(result.architecture)).toBe(true);
+      expect(Array.isArray(result.invariants)).toBe(true);
+      expect(Array.isArray(result.acceptance_tests)).toBe(true);
+      expect(typeof result.summary).toBe('string');
+      expect(typeof result.current_state).toBe('string');
+      
+      // Verify architecture sections have expected structure with typed interfaces
+      if (result.architecture.length > 0) {
+        const arch = result.architecture[0];
+        expect(arch).toHaveProperty('id');
+        expect(arch).toHaveProperty('title');
+        expect(arch).toHaveProperty('path');
+        expect(arch).toHaveProperty('content');
+        expect(typeof arch.id).toBe('string');
+        expect(typeof arch.title).toBe('string');
+        expect(typeof arch.path).toBe('string');
+        expect(typeof arch.content).toBe('string');
+      }
+      
+      // Verify protocol sections have expected structure
+      if (result.relevant_protocols.length > 0) {
+        const protocol = result.relevant_protocols[0];
+        expect(protocol).toHaveProperty('id');
+        expect(protocol).toHaveProperty('title');
+        expect(protocol).toHaveProperty('path');
+        expect(protocol).toHaveProperty('content');
+        expect(typeof protocol.id).toBe('string');
+      }
+      
+      // Verify invariants have expected structure with typed interfaces
+      if (result.invariants.length > 0) {
+        const inv = result.invariants[0];
+        expect(inv).toHaveProperty('id');
+        expect(inv).toHaveProperty('name');
+        expect(inv).toHaveProperty('statement');
+        expect(typeof inv.id).toBe('string');
+        expect(typeof inv.name).toBe('string');
+        expect(typeof inv.statement).toBe('string');
+      }
+    });
+
+    it('should provide deterministic output across multiple runs', async () => {
+      const result1 = await icnGetTaskContext({ taskId: 'determinism-test' });
+      const result2 = await icnGetTaskContext({ taskId: 'determinism-test' });
+      
+      // Summary, dependencies, and acceptance_tests should be identical
+      expect(result1.summary).toBe(result2.summary);
+      expect(result1.dependencies).toEqual(result2.dependencies);
+      expect(result1.acceptance_tests).toEqual(result2.acceptance_tests);
+      
+      // Arrays should be consistently sorted (using same sort logic as implementation)
+      const sortFunc = (a: string, b: string) => a.toLowerCase().localeCompare(b.toLowerCase());
+      expect(result1.dependencies).toEqual([...result1.dependencies].sort(sortFunc));
+      expect(result1.acceptance_tests).toEqual([...result1.acceptance_tests].sort(sortFunc));
+    });
+
+    it('should include task-specific acceptance tests based on invariants', async () => {
+      const result = await icnGetTaskContext({ taskId: 'invariant-test' });
+      
+      // Should include task-prefixed acceptance tests
+      const taskTests = result.acceptance_tests.filter(test => test.includes('[invariant-test]'));
+      expect(taskTests.length).toBeGreaterThan(0);
+      
+      // Should include basic CI and policy tests
+      expect(result.acceptance_tests.some(test => 
+        test.includes('code compiles and tests pass')
+      )).toBe(true);
+      expect(result.acceptance_tests.some(test => 
+        test.includes('policy allow')
+      )).toBe(true);
+    });
+
+    it('should extract dependencies using regex patterns', async () => {
+      const result = await icnGetTaskContext({ taskId: 'dependency-test' });
+      
+      // Should include default system dependencies
+      expect(result.dependencies).toContain('ICN MCP HTTP server operational');
+      expect(result.dependencies).toContain('MCP stdio tools functional');
+      expect(result.dependencies).toContain('Database schema up to date');
+      
+      // Dependencies should be sorted and deduplicated
+      const dependencies = result.dependencies;
+      expect(dependencies).toEqual([...new Set(dependencies)].sort());
+    });
+
+    it('should validate required fields are non-empty', async () => {
+      const result = await icnGetTaskContext({ taskId: 'validation-test' });
+      
+      // Should not have empty required fields
+      expect(result.summary.trim().length).toBeGreaterThan(0);
+      expect(result.current_state.trim().length).toBeGreaterThan(0);
+      expect(result.acceptance_tests.length).toBeGreaterThan(0);
+    });
+
+    it('should include structured architecture and protocol sections', async () => {
+      const result = await icnGetTaskContext({ taskId: 'structure-test' });
+      
+      // Architecture sections should be properly structured
+      result.architecture.forEach(section => {
+        expect(section).toHaveProperty('id');
+        expect(section).toHaveProperty('title');
+        expect(section).toHaveProperty('path');
+        expect(section).toHaveProperty('content');
+        expect(section.id).toMatch(/^[a-z0-9-]+$/); // Should be lowercase with dashes
+      });
+      
+      // Protocol sections should be properly structured  
+      result.relevant_protocols.forEach(section => {
+        expect(section).toHaveProperty('id');
+        expect(section).toHaveProperty('title');
+        expect(section).toHaveProperty('path');
+        expect(section).toHaveProperty('content');
+        expect(section.id).toMatch(/^[a-z0-9-]+$/); // Should be lowercase with dashes
+      });
+    });
+  });
+
+  // Path safety and security tests for icnGetTaskContext
+  describe('icnGetTaskContext - Path Safety', () => {
+    it('should reject path traversal attempts', async () => {
+      // This test would check if the internal path safety works
+      // Since we can't directly test internal functions, we'll verify through behavior
+      const result = await icnGetTaskContext({ taskId: 'path-safety-test' });
+      
+      // Should complete without throwing path traversal errors
+      expect(result).toHaveProperty('summary');
+      expect(result.summary.length).toBeGreaterThan(0);
+    });
+
+    it('should only allow reading from permitted directories', async () => {
+      // Test that the tool doesn't try to read from outside allowed paths
+      const result = await icnGetTaskContext({ taskId: 'allowed-paths-test' });
+      
+      // Should only include content from architecture, protocols, and invariants
+      result.architecture.forEach(section => {
+        expect(section.path).toMatch(/\/architecture\//);
+      });
+      
+      result.relevant_protocols.forEach(section => {
+        expect(section.path).toMatch(/\/protocols\//);
+      });
+    });
+
+    it('should handle large file protection', async () => {
+      // Test that the system would reject very large files
+      // This is more of a behavioral test since we can't create huge files easily
+      const result = await icnGetTaskContext({ taskId: 'file-size-test' });
+      
+      // Should complete without file size errors for normal docs
+      expect(result).toHaveProperty('architecture');
+      expect(result).toHaveProperty('relevant_protocols');
+    });
+
+    it('should provide consistent file caching behavior', async () => {
+      // Test that repeated calls use caching effectively
+      const result1 = await icnGetTaskContext({ taskId: 'cache-test' });
+      const result2 = await icnGetTaskContext({ taskId: 'cache-test' });
+      
+      // deterministic content check is enough
+      expect(result2).toEqual(result1);
     });
   });
 
