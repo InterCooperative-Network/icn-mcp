@@ -7,8 +7,7 @@
     "test": "echo ok" 
   },
   "dependencies": {
-    "agent-sdk": "*",
-    "undici": "^6.0.0"
+    "agent-sdk": "*"
   }
 }
 

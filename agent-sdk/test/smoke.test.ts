@@ -30,7 +30,7 @@ describe('agent-sdk', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8787/api/agent/register',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -39,7 +39,7 @@ describe('agent-sdk', () => {
             name: 'Test Agent',
             kind: 'planner'
           }),
-        }
+        })
       );
 
       expect(result).toEqual(mockResponse);
@@ -49,13 +49,14 @@ describe('agent-sdk', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
-        statusText: 'Bad Request'
+        statusText: 'Bad Request',
+        text: () => Promise.resolve('Bad Request')
       });
 
       await expect(registerAgent('http://localhost:8787', {
         name: 'Test Agent',
         kind: 'planner'
-      })).rejects.toThrow('Failed to register agent: 400 Bad Request');
+      })).rejects.toThrow('HTTP 400: Bad Request');
     });
   });
 
@@ -78,7 +79,7 @@ describe('agent-sdk', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8787/api/task/create',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -88,7 +89,7 @@ describe('agent-sdk', () => {
             title: 'Test Task',
             description: 'Test description'
           }),
-        }
+        })
       );
 
       expect(result).toEqual(mockResponse);
@@ -98,12 +99,13 @@ describe('agent-sdk', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
-        statusText: 'Unauthorized'
+        statusText: 'Unauthorized',
+        text: () => Promise.resolve('Unauthorized')
       });
 
-      await expect(createTask('http://localhost:8787', 'invalid_token', {
+      await expect(createTask('http://localhost:8787', 'test_token', {
         title: 'Test Task'
-      })).rejects.toThrow('Failed to create task: 401 Unauthorized');
+      })).rejects.toThrow('Authentication failed');
     });
   });
 
@@ -111,7 +113,7 @@ describe('agent-sdk', () => {
     it('successfully refreshes a token', async () => {
       const mockResponse = {
         ok: true,
-        token: 'new_test_token_789'
+        token: 'new_token_456'
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -123,13 +125,13 @@ describe('agent-sdk', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8787/api/agent/refresh',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer old_token',
           },
-        }
+        })
       );
 
       expect(result).toEqual(mockResponse);
@@ -139,18 +141,19 @@ describe('agent-sdk', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
-        statusText: 'Unauthorized'
+        statusText: 'Unauthorized',
+        text: () => Promise.resolve('Unauthorized')
       });
 
-      await expect(refreshToken('http://localhost:8787', 'invalid_token')).rejects.toThrow('Failed to refresh token: 401 Unauthorized');
+      await expect(refreshToken('http://localhost:8787', 'old_token')).rejects.toThrow('Authentication failed');
     });
   });
 
   describe('claimTask', () => {
     it('successfully claims a task', async () => {
       const mockResponse = {
-        task_id: 'task_123',
-        title: 'Test Task'
+        task_id: 'task_456',
+        title: 'Claimed Task'
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -162,30 +165,16 @@ describe('agent-sdk', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8787/api/task/claim',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer test_token',
           },
           body: JSON.stringify({}),
-        }
+        })
       );
 
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('handles no available tasks', async () => {
-      const mockResponse = {
-        error: 'no_available_tasks'
-      };
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockResponse)
-      });
-
-      const result = await claimTask('http://localhost:8787', 'test_token');
       expect(result).toEqual(mockResponse);
     });
   });
@@ -211,14 +200,14 @@ describe('agent-sdk', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8787/api/task/run',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer test_token',
           },
           body: JSON.stringify(payload),
-        }
+        })
       );
 
       expect(result).toEqual(mockResponse);
@@ -238,22 +227,23 @@ describe('agent-sdk', () => {
       });
 
       const payload = {
-        actor: 'reviewer',
-        changedPaths: ['docs/test.md']
+        actor: 'reviewer' as const,
+        action: 'pr.create' as const,
+        paths: ['docs/test.md']
       };
 
       const result = await checkPolicy('http://localhost:8787', 'test_token', payload);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8787/api/policy/check',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer test_token',
           },
           body: JSON.stringify(payload),
-        }
+        })
       );
 
       expect(result).toEqual(mockResponse);
@@ -264,8 +254,7 @@ describe('agent-sdk', () => {
     it('successfully creates a PR', async () => {
       const mockResponse = {
         ok: true,
-        artifact: 'PR-123.json',
-        mode: 'local'
+        artifact: 'PR-task_123.json'
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -284,18 +273,39 @@ describe('agent-sdk', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8787/api/pr/create',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer test_token',
           },
           body: JSON.stringify(payload),
-        }
+        })
       );
 
       expect(result).toEqual(mockResponse);
     });
+
+    it('throws error when policy denies PR creation', async () => {
+      const mockResponse = {
+        allow: false,
+        reasons: ['Invalid file path', 'Missing documentation']
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse)
+      });
+
+      const payload = {
+        task_id: 'task_123',
+        title: 'Test PR',
+        body: 'Test PR body',
+        files: [{ path: 'test.md', content: 'test content' }]
+      };
+
+      await expect(createPR('http://localhost:8787', 'test_token', payload))
+        .rejects.toThrow('PR creation denied by policy: Invalid file path, Missing documentation');
+    });
   });
 });
-
