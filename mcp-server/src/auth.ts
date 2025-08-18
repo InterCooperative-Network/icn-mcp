@@ -11,6 +11,7 @@ export type AuthenticatedUser = {
 declare module 'fastify' {
   interface FastifyRequest {
     agent?: AuthenticatedUser;
+    cachedMaintainerAuth?: AuthenticatedUser | null;
   }
 }
 
@@ -45,18 +46,34 @@ export function clearRateLimitStore(): void {
   rateLimitStore.clear();
 }
 
-// Cleanup expired entries periodically
-const cleanupInterval = setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (now > entry.resetTime) {
-      rateLimitStore.delete(key);
-    }
-  }
-}, 30000); // Clean up every 30 seconds
+// Store cleanup interval reference for proper shutdown
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
-// Clear the interval on process exit to prevent memory leaks
-process.on('exit', () => clearInterval(cleanupInterval));
+// Initialize cleanup interval
+export function initRateLimitCleanup(): ReturnType<typeof setInterval> {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+  }
+  
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitStore.entries()) {
+      if (now > entry.resetTime) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }, 30000); // Clean up every 30 seconds
+  
+  return cleanupInterval;
+}
+
+// Cleanup function for graceful shutdown
+export function stopRateLimitCleanup(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+}
 
 export function checkRateLimit(identifier: string, isMaintainer: boolean = false): { allowed: boolean; retryAfter?: number } {
   const now = Date.now();
@@ -91,18 +108,30 @@ export function rateLimitMiddleware() {
     // Use token if available, otherwise fall back to IP
     const identifier = token || ip;
     
-    // Check if this is a maintainer (for higher limits)
-    const isMaintainer = token ? !!validateMaintainerToken(token) : false;
+    // Check if this is a maintainer (for higher limits) and cache the result
+    let isMaintainer = false;
+    if (token) {
+      // Use cached result if available
+      if (req.cachedMaintainerAuth === undefined) {
+        req.cachedMaintainerAuth = validateMaintainerToken(token);
+      }
+      isMaintainer = !!req.cachedMaintainerAuth;
+    }
     
     const rateCheck = checkRateLimit(identifier, isMaintainer);
     
     if (!rateCheck.allowed) {
       req.log.warn({
         reqId: req.id,
+        event: 'rate_limit_exceeded',
         ip,
         tokenPrefix: token?.slice(0, 8),
-        retryAfter: rateCheck.retryAfter
-      }, 'rate limit exceeded');
+        userAgent: req.headers['user-agent'],
+        retryAfter: rateCheck.retryAfter,
+        isMaintainer,
+        endpoint: req.url,
+        method: req.method
+      }, 'Rate limit exceeded for request');
       
       reply.header('Retry-After', rateCheck.retryAfter!.toString());
       return reply.code(429).send({ 
@@ -147,42 +176,62 @@ export function requireAuth(opts?: { allowIfNoAgents?: boolean, requireMaintaine
   return async function (req: FastifyRequest, reply: FastifyReply) {
     try {
       if (allowIfNoAgents && countAgents() === 0) {
-        req.log.debug({ reqId: req.id }, 'allowing unauthenticated request - no agents registered');
+        req.log.debug({ 
+          reqId: req.id,
+          event: 'auth_bypass_no_agents',
+          endpoint: req.url,
+          method: req.method
+        }, 'Allowing unauthenticated request - no agents registered');
         return;
       }
       
       const auth = req.headers['authorization'];
       if (!auth || !auth.startsWith('Bearer ')) {
         req.log.warn({ 
-          reqId: req.id, 
+          reqId: req.id,
+          event: 'auth_failed_invalid_header',
           ip: req.ip,
-          userAgent: req.headers['user-agent'] 
-        }, 'auth failed: missing/invalid authorization header');
+          userAgent: req.headers['user-agent'],
+          endpoint: req.url,
+          method: req.method
+        }, 'Authentication failed: missing or invalid authorization header');
         return reply.code(401).send({ ok: false, error: 'unauthorized' });
       }
       
       const token = auth.slice('Bearer '.length).trim();
       
-      // Try maintainer token first
-      const maintainer = validateMaintainerToken(token);
+      // Try maintainer token first (use cached result if available)
+      let maintainer: AuthenticatedUser | null;
+      if (req.cachedMaintainerAuth === undefined) {
+        req.cachedMaintainerAuth = validateMaintainerToken(token);
+      }
+      maintainer = req.cachedMaintainerAuth;
+      
       if (maintainer) {
         req.agent = maintainer;
         req.log.info({ 
-          reqId: req.id, 
+          reqId: req.id,
+          event: 'auth_success_maintainer',
           user: { id: maintainer.id, role: maintainer.role, kind: maintainer.kind },
           ip: req.ip,
-          userAgent: req.headers['user-agent']
-        }, 'authenticated maintainer request');
+          userAgent: req.headers['user-agent'],
+          endpoint: req.url,
+          method: req.method
+        }, 'Authenticated maintainer request');
         return;
       }
       
       // If maintainer required but not found, reject
       if (requireMaintainer) {
         req.log.warn({ 
-          reqId: req.id, 
+          reqId: req.id,
+          event: 'auth_failed_maintainer_required',
           tokenPrefix: token.slice(0, 8),
-          ip: req.ip 
-        }, 'auth failed: maintainer access required');
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          endpoint: req.url,
+          method: req.method
+        }, 'Authentication failed: maintainer access required');
         return reply.code(403).send({ ok: false, error: 'maintainer_access_required' });
       }
       
@@ -190,11 +239,14 @@ export function requireAuth(opts?: { allowIfNoAgents?: boolean, requireMaintaine
       const agent = getAgentByToken(token);
       if (!agent) {
         req.log.warn({ 
-          reqId: req.id, 
+          reqId: req.id,
+          event: 'auth_failed_token_invalid',
           tokenPrefix: token.slice(0, 8),
           ip: req.ip,
-          userAgent: req.headers['user-agent']
-        }, 'auth failed: token not recognized');
+          userAgent: req.headers['user-agent'],
+          endpoint: req.url,
+          method: req.method
+        }, 'Authentication failed: token not recognized');
         return reply.code(401).send({ ok: false, error: 'unauthorized' });
       }
       
@@ -205,16 +257,23 @@ export function requireAuth(opts?: { allowIfNoAgents?: boolean, requireMaintaine
         role: 'agent' as const 
       };
       req.log.debug({ 
-        reqId: req.id, 
+        reqId: req.id,
+        event: 'auth_success_agent',
         user: req.agent,
-        ip: req.ip 
-      }, 'authenticated agent request');
+        ip: req.ip,
+        endpoint: req.url,
+        method: req.method
+      }, 'Authenticated agent request');
     } catch (err) {
       req.log.error({ 
-        err, 
+        err,
         reqId: req.id,
-        ip: req.ip 
-      }, 'auth error');
+        event: 'auth_error',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        endpoint: req.url,
+        method: req.method
+      }, 'Authentication error occurred');
       return reply.code(401).send({ ok: false, error: 'unauthorized' });
     }
   };

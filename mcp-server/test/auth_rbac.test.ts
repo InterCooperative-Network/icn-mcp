@@ -4,11 +4,12 @@ import { healthRoute, apiRoutes } from '@/api';
 import { clearRateLimitStore, rateLimitMiddleware } from '@/auth';
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 describe('Authentication, RBAC, and Rate Limiting', () => {
   beforeEach(() => {
     // Use a unique DB for each test to ensure isolation
-    const testDb = path.resolve(process.cwd(), `var/test-rbac-${Date.now()}-${Math.random()}.sqlite`);
+    const testDb = path.resolve(process.cwd(), `var/test-rbac-${Date.now()}-${randomUUID()}.sqlite`);
     process.env.MCP_DB_PATH = testDb;
     try { fs.unlinkSync(testDb); } catch {/* noop */}
     try { fs.rmSync(path.resolve(process.cwd(), 'artifacts'), { recursive: true, force: true }); } catch {/* noop */}

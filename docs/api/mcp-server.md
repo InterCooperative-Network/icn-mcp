@@ -41,6 +41,29 @@ The MCP server implements comprehensive security including:
 - **Rate Limiting**: Per-IP and per-token rate limits with higher limits for maintainers
 - **Audit Logging**: Comprehensive logging of authentication events, failures, and admin actions
 
+### Token Management and Expiration
+
+#### Agent Tokens
+- **Dynamic Creation**: Agent tokens are generated during registration and stored in the database
+- **Expiration**: Agent tokens automatically expire after 24 hours
+- **Refresh**: Expired tokens can be renewed using the `/api/agent/refresh` endpoint with the current (potentially expired) token
+- **Storage**: Tokens are stored hashed in the database for security
+- **Grace Period**: Expired tokens are immediately invalid with no grace window
+
+#### Maintainer Tokens
+- **Environment Configuration**: Maintainer tokens are configured via environment variables
+- **No Expiration**: Maintainer tokens do not expire automatically
+- **Two Types**: 
+  - `MAINTAINER_ADMIN_TOKEN`: Single admin token with full privileges
+  - `MAINTAINER_TOKENS`: Comma-separated list of regular maintainer tokens
+- **Rotation**: Tokens should be rotated manually by updating environment variables and restarting the server
+
+#### Token Security Best Practices
+- **Entropy**: Maintainer tokens should have high entropy (≥32 characters)
+- **Storage**: Agent tokens are stored hashed in the database (not plain text)
+- **Logging**: All authentication attempts are logged with IP addresses and user agents
+- **Rate Limiting**: Tokens are subject to rate limiting (higher limits for maintainers)
+
 ### Environment Variables
 
 | Variable | Default | Description |

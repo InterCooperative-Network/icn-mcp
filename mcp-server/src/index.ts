@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { healthRoute, apiRoutes } from './api.js';
 import { metricsRoute } from './metrics.js';
-import { rateLimitMiddleware } from './auth.js';
+import { rateLimitMiddleware, initRateLimitCleanup, stopRateLimitCleanup } from './auth.js';
 
 // Configure pino logger
 const isDev = process.env.NODE_ENV !== 'production';
@@ -68,6 +68,12 @@ app.addHook('preHandler', async (req, reply) => {
 app.register(healthRoute);
 app.register(apiRoutes, { prefix: '/api' });
 app.register(metricsRoute);
+
+// Initialize rate limit cleanup and register shutdown handler
+initRateLimitCleanup();
+app.addHook('onClose', async () => {
+  stopRateLimitCleanup();
+});
 
 const port = Number(process.env.PORT || 8787);
 app.listen({ port, host: '0.0.0.0' })
