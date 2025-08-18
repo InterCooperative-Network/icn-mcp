@@ -23,6 +23,9 @@ RUN cd mcp-server && npm ci
 # Copy source code including pre-built dist
 COPY . .
 
+# Fix TypeScript path aliases in built files
+RUN npx tsc-alias -p ./mcp-server/tsconfig.json --dir ./dist --resolve-full-paths
+
 # Create directories for runtime data
 RUN mkdir -p /app/var /app/logs
 
