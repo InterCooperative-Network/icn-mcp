@@ -19,7 +19,8 @@ import {
   icnGetNextStep, 
   icnCheckpoint, 
   icnListWorkflowTemplates,
-  icnGetWorkflowState
+  icnGetWorkflowState,
+  icnWorkflow
 } from './tools/icn_workflow.js';
 import { icnExtractPrinciples } from './tools/icn_extract_principles.js';
 import { icnBuildContext } from './tools/icn_build_context.js';
@@ -272,6 +273,30 @@ class ICNMCPServer {
             const result = await executeWithTimeout(() => icnGetWorkflowState({
               workflowId: args.workflowId as string
             }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_workflow': {
+            if (!args?.intent || typeof args.intent !== 'string') {
+              throw new Error('intent parameter is required and must be a string');
+            }
+            const context = typeof args.context === 'string' ? args.context : undefined;
+            const constraints = Array.isArray(args.constraints) ? args.constraints : undefined;
+            const actor = typeof args.actor === 'string' ? args.actor : undefined;
+            
+            const result = await executeWithTimeout(() => icnWorkflow({
+              intent: args.intent as string,
+              context,
+              constraints,
+              actor
+            }), 60000); // 60 second timeout for orchestration
             return {
               content: [
                 {

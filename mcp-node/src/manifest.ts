@@ -205,6 +205,33 @@ export function generateToolManifest(): ToolManifest[] {
       }
     },
     {
+      name: 'icn_workflow',
+      description: 'Orchestrate multiple MCP tools to produce actionable plans from intents. This tool sequences other tools like icn_get_architecture, icn_get_invariants, icn_check_policy to create comprehensive implementation plans.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          intent: {
+            type: 'string',
+            description: 'The high-level intent or goal that needs to be planned and executed'
+          },
+          context: {
+            type: 'string',
+            description: 'Optional additional context such as task IDs, file paths, or domain-specific information'
+          },
+          constraints: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of constraints or limitations to consider'
+          },
+          actor: {
+            type: 'string',
+            description: 'The actor (user/agent) who will execute the plan, used for policy checks'
+          }
+        },
+        required: ['intent']
+      }
+    },
+    {
       name: 'icn_extract_principles',
       description: 'Parse documents for MUST/SHOULD/MAY requirements, invariants, formulas, and governance rules with confidence scores',
       inputSchema: {

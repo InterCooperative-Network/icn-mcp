@@ -5,6 +5,11 @@ import {
   WorkflowCheckpoint 
 } from '../workflow-engine.js';
 import { WorkflowTemplate } from '../workflows/schema.js';
+import { icnGetArchitecture } from './icn_get_architecture.js';
+import { icnGetInvariants } from './icn_get_invariants.js';
+import { icnCheckPolicy } from './icn_check_policy.js';
+import { icnGetTaskContext } from './icn_get_task_context.js';
+import { icnSuggestApproach } from './icn_suggest_approach.js';
 
 export interface StartWorkflowParams {
   templateId: string;
@@ -56,6 +61,37 @@ export interface ListTemplatesResponse {
   templates: WorkflowTemplate[];
   categories: string[];
   tags: string[];
+}
+
+export interface OrchestrationStep {
+  tool: string;
+  params: Record<string, any>;
+  description: string;
+  dependsOn?: string[];
+}
+
+export interface OrchestrationParams {
+  intent: string;
+  context?: string;
+  constraints?: string[];
+  actor?: string;
+}
+
+export interface OrchestrationResponse {
+  plan: {
+    id: string;
+    intent: string;
+    steps: OrchestrationStep[];
+    expectedDuration: string;
+    complexity: 'low' | 'medium' | 'high';
+  };
+  execution: {
+    stepResults: Record<string, any>;
+    currentStep: number;
+    status: 'pending' | 'in_progress' | 'completed' | 'failed';
+    startedAt: Date;
+    completedAt?: Date;
+  };
 }
 
 /**
@@ -217,4 +253,229 @@ export async function icnGetWorkflowState(params: { workflowId: string }): Promi
   }
 
   return state;
+}
+
+/**
+ * Orchestrate multiple MCP tools to produce actionable plans from intents
+ */
+export async function icnWorkflow(params: OrchestrationParams): Promise<OrchestrationResponse> {
+  const { intent, context, constraints = [], actor } = params;
+  
+  // Generate unique ID for this orchestration
+  const orchestrationId = `orch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const startedAt = new Date();
+  
+  // Analyze intent to determine required tools and sequence
+  const plan = await generateOrchestrationPlan(intent, context, constraints, actor);
+  
+  // Execute the orchestration plan
+  const stepResults: Record<string, any> = {};
+  let currentStep = 0;
+  let status: 'pending' | 'in_progress' | 'completed' | 'failed' = 'in_progress';
+  
+  try {
+    for (const [index, step] of plan.steps.entries()) {
+      currentStep = index;
+      
+      // Check dependencies
+      if (step.dependsOn) {
+        for (const dependency of step.dependsOn) {
+          if (!stepResults[dependency]) {
+            throw new Error(`Step '${step.tool}' depends on '${dependency}' which hasn't completed successfully`);
+          }
+        }
+      }
+      
+      // Execute the step
+      let result;
+      switch (step.tool) {
+        case 'icn_get_architecture':
+          result = await icnGetArchitecture(step.params.task);
+          break;
+        case 'icn_get_invariants':
+          result = await icnGetInvariants();
+          break;
+        case 'icn_check_policy':
+          if (!step.params.changeset || !Array.isArray(step.params.changeset)) {
+            throw new Error(`icn_check_policy requires 'changeset' parameter as array`);
+          }
+          result = await icnCheckPolicy({
+            changeset: step.params.changeset,
+            actor: step.params.actor
+          });
+          break;
+        case 'icn_get_task_context':
+          if (!step.params.taskId || typeof step.params.taskId !== 'string') {
+            throw new Error(`icn_get_task_context requires 'taskId' parameter as string`);
+          }
+          result = await icnGetTaskContext({
+            taskId: step.params.taskId
+          });
+          break;
+        case 'icn_suggest_approach':
+          if (!step.params.task_description || typeof step.params.task_description !== 'string') {
+            throw new Error(`icn_suggest_approach requires 'task_description' parameter as string`);
+          }
+          result = await icnSuggestApproach({
+            task_description: step.params.task_description,
+            files_to_modify: step.params.files_to_modify,
+            constraints: step.params.constraints,
+            context: step.params.context
+          });
+          break;
+        default:
+          throw new Error(`Unknown tool: ${step.tool}`);
+      }
+      
+      stepResults[step.tool] = result;
+    }
+    
+    status = 'completed';
+  } catch (error) {
+    status = 'failed';
+    stepResults.error = error instanceof Error ? error.message : 'Unknown error';
+  }
+  
+  return {
+    plan: {
+      id: orchestrationId,
+      intent,
+      steps: plan.steps,
+      expectedDuration: plan.expectedDuration,
+      complexity: plan.complexity
+    },
+    execution: {
+      stepResults,
+      currentStep,
+      status,
+      startedAt,
+      completedAt: status === 'completed' || status === 'failed' ? new Date() : undefined
+    }
+  };
+}
+
+/**
+ * Generate an orchestration plan based on intent analysis
+ */
+async function generateOrchestrationPlan(
+  intent: string, 
+  context?: string, 
+  constraints: string[] = [], 
+  actor?: string
+): Promise<{ steps: OrchestrationStep[]; expectedDuration: string; complexity: 'low' | 'medium' | 'high' }> {
+  const steps: OrchestrationStep[] = [];
+  
+  // Intent analysis patterns
+  const intentLower = intent.toLowerCase();
+  const isArchitectureRelated = /\b(architect|design|structure|component|system)\b/.test(intentLower);
+  const isPolicyRelated = /\b(policy|rule|permission|access|allow|deny)\b/.test(intentLower);
+  const isTaskRelated = /\b(task|plan|implement|develop|build|modify|add|create|update)\b/.test(intentLower);
+  const isApproachRelated = /\b(approach|method|strategy|how)\b/.test(intentLower);
+  
+  // Always start with architecture context for complex intents
+  if (isArchitectureRelated || isTaskRelated) {
+    steps.push({
+      tool: 'icn_get_architecture',
+      params: { task: intent },
+      description: 'Gather relevant architecture documentation and patterns'
+    });
+  }
+  
+  // Add invariants check for system design or implementation
+  if (isArchitectureRelated || isTaskRelated) {
+    steps.push({
+      tool: 'icn_get_invariants',
+      params: {},
+      description: 'Retrieve system invariants and constraints',
+      dependsOn: steps.length > 0 ? [steps[0].tool] : undefined
+    });
+  }
+  
+  // Add task context if dealing with specific tasks
+  if (isTaskRelated && context) {
+    steps.push({
+      tool: 'icn_get_task_context',
+      params: { taskId: context },
+      description: 'Gather specific task context and requirements'
+    });
+  }
+  
+  // Policy check for implementation or modification intents
+  if (isPolicyRelated || isTaskRelated) {
+    // Generate likely file paths from intent
+    const changeset = extractLikelyFiles(intent, context);
+    if (changeset.length > 0) {
+      steps.push({
+        tool: 'icn_check_policy',
+        params: { changeset, actor },
+        description: 'Validate proposed changes against ICN policies',
+        dependsOn: steps.slice(0, -1).map(s => s.tool)
+      });
+    }
+  }
+  
+  // Add approach suggestion for planning intents
+  if (isApproachRelated || isTaskRelated) {
+    steps.push({
+      tool: 'icn_suggest_approach',
+      params: { 
+        task_description: intent,
+        context,
+        constraints
+      },
+      description: 'Generate implementation approach and recommendations',
+      dependsOn: steps.slice(0, -1).map(s => s.tool)
+    });
+  }
+  
+  // Determine complexity and duration
+  const complexity: 'low' | 'medium' | 'high' = 
+    steps.length <= 2 ? 'low' : 
+    steps.length <= 4 ? 'medium' : 'high';
+    
+  const expectedDuration = 
+    complexity === 'low' ? '30-60 seconds' :
+    complexity === 'medium' ? '1-2 minutes' : '2-5 minutes';
+  
+  return { steps, expectedDuration, complexity };
+}
+
+/**
+ * Extract likely file paths from intent description
+ */
+function extractLikelyFiles(intent: string, context?: string): string[] {
+  const files: string[] = [];
+  
+  // Common patterns in intents that suggest file modifications
+  if (/mcp.?server|server/i.test(intent)) {
+    files.push('mcp-server/src/');
+  }
+  
+  if (/mcp.?node|node|tool/i.test(intent)) {
+    files.push('mcp-node/src/');
+  }
+  
+  if (/agent|planner|architect|ops|reviewer/i.test(intent)) {
+    files.push('agents/');
+  }
+  
+  if (/workflow|template/i.test(intent)) {
+    files.push('workflows/');
+  }
+  
+  if (/doc|documentation|readme/i.test(intent)) {
+    files.push('docs/');
+  }
+  
+  if (/test|spec/i.test(intent)) {
+    files.push('test/', '**/*.test.ts');
+  }
+  
+  // If context provides more specific paths, include them
+  if (context) {
+    const contextFiles = context.match(/[\w-]+\/[\w-./]*\.[\w]+/g) || [];
+    files.push(...contextFiles);
+  }
+  
+  return files;
 }
