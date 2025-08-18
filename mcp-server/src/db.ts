@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 const defaultDbPath = path.resolve(process.cwd(), '../var/icn-mcp.sqlite');
 const MIGRATIONS_DIR = path.resolve(process.cwd(), '../db/migrations');
 
-export type InsertTaskInput = { title: string; description?: string; created_by?: string };
+export type InsertTaskInput = { title: string; description?: string; created_by?: string; id?: string };
 export type TaskRow = { id: string; title: string; description: string | null; status: string; created_at: string };
 export type InsertRunInput = { task_id: string; agent: string; status: string; notes?: string };
 export type InsertArtifactInput = { task_id: string; kind: string; path: string; meta?: unknown };
@@ -208,7 +208,9 @@ function generateId(prefix: string): string {
 
 export function insertTask(input: InsertTaskInput): { id: string } {
   const db = getDb();
-  const id = generateId('task');
+  
+  // Force use the provided ID if it exists  
+  const id = input.id ? input.id : generateId('task');
   
   return withWriteTransaction(db, () => {
     const stmt = db.prepare(

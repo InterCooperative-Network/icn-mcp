@@ -39,6 +39,20 @@ const app = Fastify({
   }
 });
 
+// Add raw body parser for webhook signature verification
+app.addContentTypeParser('*', { parseAs: 'buffer' }, (req, body, done) => {
+  // @ts-expect-error augment at runtime
+  req.rawBody = body;
+  done(null, body);
+});
+
+// Type augmentation for rawBody
+declare module 'fastify' {
+  interface FastifyRequest {
+    rawBody?: Buffer;
+  }
+}
+
 app.register(healthRoute);
 app.register(apiRoutes, { prefix: '/api' });
 app.register(metricsRoute);

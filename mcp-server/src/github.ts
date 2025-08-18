@@ -126,3 +126,91 @@ export async function createIssue(input: z.infer<typeof IssueCreate>): Promise<{
   return { mode: 'local', artifact: file };
 }
 
+// GitHub API integration for webhook responses
+export async function createCommitStatus(options: {
+  sha: string;
+  state: 'pending' | 'success' | 'error' | 'failure';
+  context: string;
+  description?: string;
+  target_url?: string;
+}): Promise<{ mode: 'github'; url: string } | { mode: 'local'; artifact: string }> {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = GITHUB_OWNER;
+  const repo = GITHUB_REPO;
+  
+  if (token) {
+    const octokit = new Octokit({ auth: token });
+    const { data: status } = await octokit.repos.createCommitStatus({
+      owner,
+      repo,
+      sha: options.sha,
+      state: options.state,
+      context: options.context,
+      description: options.description,
+      target_url: options.target_url
+    });
+    return { mode: 'github', url: status.url };
+  }
+  
+  // local artifact fallback
+  const artifactsDir = path.resolve(process.cwd(), 'artifacts');
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  const file = path.join(artifactsDir, `STATUS-${Date.now()}.json`);
+  fs.writeFileSync(file, JSON.stringify(options, null, 2), 'utf8');
+  return { mode: 'local', artifact: file };
+}
+
+export async function createPullRequestComment(options: {
+  pull_number: number;
+  body: string;
+}): Promise<{ mode: 'github'; url: string } | { mode: 'local'; artifact: string }> {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = GITHUB_OWNER;
+  const repo = GITHUB_REPO;
+  
+  if (token) {
+    const octokit = new Octokit({ auth: token });
+    const { data: comment } = await octokit.issues.createComment({
+      owner,
+      repo,
+      issue_number: options.pull_number,
+      body: options.body
+    });
+    return { mode: 'github', url: comment.html_url };
+  }
+  
+  // local artifact fallback
+  const artifactsDir = path.resolve(process.cwd(), 'artifacts');
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  const file = path.join(artifactsDir, `COMMENT-${Date.now()}.json`);
+  fs.writeFileSync(file, JSON.stringify(options, null, 2), 'utf8');
+  return { mode: 'local', artifact: file };
+}
+
+export async function createIssueComment(options: {
+  issue_number: number;
+  body: string;
+}): Promise<{ mode: 'github'; url: string } | { mode: 'local'; artifact: string }> {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = GITHUB_OWNER;
+  const repo = GITHUB_REPO;
+  
+  if (token) {
+    const octokit = new Octokit({ auth: token });
+    const { data: comment } = await octokit.issues.createComment({
+      owner,
+      repo,
+      issue_number: options.issue_number,
+      body: options.body
+    });
+    return { mode: 'github', url: comment.html_url };
+  }
+  
+  // local artifact fallback
+  const artifactsDir = path.resolve(process.cwd(), 'artifacts');
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  const file = path.join(artifactsDir, `COMMENT-${Date.now()}.json`);
+  fs.writeFileSync(file, JSON.stringify(options, null, 2), 'utf8');
+  return { mode: 'local', artifact: file };
+}
+
