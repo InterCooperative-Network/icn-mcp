@@ -208,11 +208,7 @@ function generateId(prefix: string): string {
 
 export function insertTask(input: InsertTaskInput): { id: string } {
   const db = getDb();
-  console.log('insertTask input:', input);
-  console.log('input.id:', input.id);
-  console.log('typeof input.id:', typeof input.id);
   const id = input.id || generateId('task');
-  console.log('final id:', id);
   
   return withWriteTransaction(db, () => {
     const stmt = db.prepare(
