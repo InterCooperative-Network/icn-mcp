@@ -2,10 +2,40 @@
   "no_direct_merges": true,
   "codeowners_integration": true,
   "path_caps": {
-    "architect": ["docs/**", "mcp-server/src/types.ts"],
-    "planner": ["tasks/**", "docs/tasks/**", "workers/planner/**"],
-    "reviewer": ["docs/**", ".github/**", "ci/**", "tools/**", "workers/reviewer/**"],
-    "ops": [".github/**", "ci/**", "tools/**", "mcp-server/src/metrics.ts", "workers/ops/**"]
+    "architect": [
+      "docs/**",
+      "mcp-server/src/types.ts",
+      "mcp-server/src/api.ts"
+    ],
+    "planner": [
+      "tasks/**",
+      "docs/tasks/**",
+      "docs/planning/**"
+    ],
+    "reviewer": [
+      "docs/**",
+      ".github/**",
+      "ci/**",
+      "tools/**",
+      "*.md"
+    ],
+    "ops": [
+      ".github/**",
+      "ci/**",
+      "tools/**",
+      "mcp-server/src/metrics.ts",
+      "mcp-server/src/index.ts",
+      "Dockerfile",
+      "*.yml",
+      "*.yaml"
+    ],
+    "security": [
+      "mcp-server/src/auth.ts",
+      "mcp-server/src/policy.ts",
+      "mcp-server/policy.rules.json",
+      "docs/security/**",
+      "security/**"
+    ]
   },
   "reviews_required": [
     { "paths": ["docs/protocols/**"], "reviewers": ["security", "fahertym"] },

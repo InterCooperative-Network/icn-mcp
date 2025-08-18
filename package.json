@@ -12,7 +12,7 @@
     "build": "npm run -ws --if-present build",
     "test": "npm run -ws --if-present test",
     "lint": "eslint \"**/*.ts\" --max-warnings=0",
-    "check": "node tools/ci/validate_json.js && node tools/ci/validate_spec_links.js && node tools/ci/check_invariants.js",
+    "check": "node tools/ci/validate_json.js && node tools/ci/validate_spec_links.js && node tools/ci/check_invariants.js && node tools/ci/test-policy-cli.js",
     "mcp-server": "node mcp-node/dist/server.js"
   },
   "engines": {
