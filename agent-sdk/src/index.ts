@@ -1,68 +1,61 @@
-import type { AgentRegister, TaskCreate, AgentRegisterResponse, TaskCreateResponse, TokenRefreshResponse } from './types.js';
+import { createClient } from './sdk.js';
+import type { 
+  AgentRegister, 
+  TaskCreate, 
+  AgentRegisterResponse, 
+  TaskCreateResponse, 
+  TokenRefreshResponse,
+  TaskClaimResponse,
+  TaskRunPayload,
+  TaskRunResponse,
+  PolicyCheckPayload,
+  PolicyDecision,
+  PrCreatePayload,
+  PrCreateResponse
+} from './schemas.js';
 
+// Legacy function-based API for backward compatibility
 export async function registerAgent(baseUrl: string, payload: AgentRegister): Promise<AgentRegisterResponse> {
-  const response = await fetch(`${baseUrl}/api/agent/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to register agent: ${response.status} ${response.statusText}`);
-  }
-
-  const result = await response.json() as AgentRegisterResponse;
-  if (!result.ok) {
-    throw new Error('Agent registration failed');
-  }
-
-  return result;
+  const client = createClient(baseUrl);
+  return client.registerAgent(payload);
 }
 
 export async function createTask(baseUrl: string, token: string, payload: TaskCreate): Promise<TaskCreateResponse> {
-  const response = await fetch(`${baseUrl}/api/task/create`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create task: ${response.status} ${response.statusText}`);
-  }
-
-  const result = await response.json() as TaskCreateResponse;
-  if (!result.ok) {
-    throw new Error('Task creation failed');
-  }
-
-  return result;
+  const client = createClient(baseUrl, token);
+  return client.tasks.create(payload);
 }
 
 export async function refreshToken(baseUrl: string, currentToken: string): Promise<TokenRefreshResponse> {
-  const response = await fetch(`${baseUrl}/api/agent/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${currentToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to refresh token: ${response.status} ${response.statusText}`);
-  }
-
-  const result = await response.json() as TokenRefreshResponse;
-  if (!result.ok) {
-    throw new Error('Token refresh failed');
-  }
-
-  return result;
+  const client = createClient(baseUrl, currentToken);
+  return client.refreshToken();
 }
 
-export * from './types.js';
+export async function claimTask(baseUrl: string, token: string): Promise<TaskClaimResponse> {
+  const client = createClient(baseUrl, token);
+  return client.tasks.claim();
+}
+
+export async function runTask(baseUrl: string, token: string, payload: TaskRunPayload): Promise<TaskRunResponse> {
+  const client = createClient(baseUrl, token);
+  return client.tasks.update(payload);
+}
+
+export async function checkPolicy(baseUrl: string, token: string, payload: PolicyCheckPayload): Promise<PolicyDecision> {
+  const client = createClient(baseUrl, token);
+  return client.policy.check(payload);
+}
+
+export async function createPR(baseUrl: string, token: string, payload: PrCreatePayload): Promise<PrCreateResponse> {
+  const client = createClient(baseUrl, token);
+  return client.pr.create(payload);
+}
+
+// Export new client-based API
+export { createClient, ICNClient } from './sdk.js';
+
+// Export types and schemas
+export * from './schemas.js';
+export * from './errors.js';
+export { HttpClient } from './client.js';
+export type { TimeoutConfig, RetryConfig, ClientConfig } from './client.js';
 
