@@ -4,12 +4,13 @@ This document describes how to integrate the ICN Model Context Protocol (MCP) se
 
 ## Overview
 
-The ICN MCP server exposes four key tools that provide GitHub Copilot with ICN-specific domain knowledge:
+The ICN MCP server exposes key tools that provide GitHub Copilot with ICN-specific domain knowledge:
 
 - **icn_get_architecture**: Retrieve ICN architecture and protocol documentation
 - **icn_get_invariants**: List system invariants from the ICN catalog
 - **icn_check_policy**: Validate changes against ICN policies
 - **icn_get_task_context**: Get full task briefings with requirements and constraints
+- **icn_workflow**: Orchestrate multiple tools to produce actionable plans from intents
 
 ## Setup
 
@@ -166,6 +167,76 @@ Retrieves full task briefing including requirements, constraints, and guidance.
 }
 ```
 
+### icn_workflow
+
+Orchestrates multiple MCP tools to produce actionable plans from high-level intents. This tool sequences other tools like `icn_get_architecture`, `icn_get_invariants`, `icn_check_policy` to create comprehensive implementation plans.
+
+**Parameters:**
+- `intent` (required): The high-level intent or goal that needs to be planned and executed
+- `context` (optional): Additional context such as task IDs, file paths, or domain-specific information
+- `constraints` (optional): Array of constraints or limitations to consider
+- `actor` (optional): The actor (user/agent) who will execute the plan, used for policy checks
+
+**Response:**
+```json
+{
+  "plan": {
+    "id": "orch_1234567890_abc123",
+    "intent": "Implement new MCP tool for data processing",
+    "steps": [
+      {
+        "tool": "icn_get_architecture",
+        "params": { "task": "Implement new MCP tool for data processing" },
+        "description": "Gather relevant architecture documentation and patterns"
+      },
+      {
+        "tool": "icn_get_invariants",
+        "params": {},
+        "description": "Retrieve system invariants and constraints",
+        "dependsOn": ["icn_get_architecture"]
+      },
+      {
+        "tool": "icn_check_policy",
+        "params": { "changeset": ["mcp-node/src/"], "actor": "architect" },
+        "description": "Validate proposed changes against ICN policies",
+        "dependsOn": ["icn_get_architecture", "icn_get_invariants"]
+      },
+      {
+        "tool": "icn_suggest_approach",
+        "params": { 
+          "task_description": "Implement new MCP tool for data processing",
+          "context": null,
+          "constraints": []
+        },
+        "description": "Generate implementation approach and recommendations",
+        "dependsOn": ["icn_get_architecture", "icn_get_invariants", "icn_check_policy"]
+      }
+    ],
+    "expectedDuration": "1-2 minutes",
+    "complexity": "medium"
+  },
+  "execution": {
+    "stepResults": {
+      "icn_get_architecture": { "sections": [...] },
+      "icn_get_invariants": { "invariants": [...] },
+      "icn_check_policy": { "allow": true, "reasons": [] },
+      "icn_suggest_approach": { "approach": {...}, "playbooks": [...] }
+    },
+    "currentStep": 4,
+    "status": "completed",
+    "startedAt": "2024-01-15T10:30:00Z",
+    "completedAt": "2024-01-15T10:31:30Z"
+  }
+}
+```
+
+**Intelligence Features:**
+- **Pattern Recognition**: Analyzes intent keywords to determine which tools are needed
+- **Dependency Management**: Automatically establishes proper execution order for tools
+- **File Path Extraction**: Identifies likely modified files from intent descriptions for policy checks
+- **Complexity Assessment**: Categorizes workflows as low/medium/high complexity with time estimates
+- **Context Integration**: Uses task context when available to enhance planning accuracy
+
 ## Usage Examples
 
 ### Getting Architecture Context
@@ -200,6 +271,38 @@ icn_get_task_context({taskId: "TASK-123"})
 ```
 
 This provides comprehensive guidance including coding conventions, test patterns, and policy constraints.
+
+### Orchestrating Complex Planning
+
+For complex development tasks that require multiple tools, Copilot can use workflow orchestration:
+
+```
+icn_workflow({
+  intent: "Implement new MCP tool for workflow management", 
+  actor: "architect",
+  constraints: ["maintain backward compatibility", "follow existing patterns"]
+})
+```
+
+This automatically sequences multiple tools:
+1. Gets relevant architecture documentation 
+2. Retrieves system invariants and constraints
+3. Checks policy compliance for likely file changes
+4. Suggests implementation approach based on all gathered context
+
+### Planning from High-Level Intent
+
+Copilot can convert high-level intents into actionable plans:
+
+```
+icn_workflow({
+  intent: "Add GitHub integration with webhook support",
+  context: "mcp-server workspace", 
+  actor: "ops"
+})
+```
+
+The orchestration intelligently determines which tools to call based on keywords in the intent and produces a comprehensive execution plan with dependencies properly ordered.
 
 ## Development Notes
 

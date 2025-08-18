@@ -1,0 +1,105 @@
+{
+  "id": "intent-to-implementation",
+  "version": "1.0.0",
+  "name": "Intent to Implementation Workflow",
+  "description": "Convert high-level intents into actionable implementation plans using workflow orchestration",
+  "category": "planning",
+  "tags": ["orchestration", "planning", "implementation", "automation"],
+  "steps": [
+    {
+      "id": "capture-intent",
+      "title": "Capture Intent",
+      "description": "Document the high-level intent and gather context",
+      "actions": [
+        "Clearly articulate the intent or goal",
+        "Identify the actor who will execute the plan",
+        "Document any constraints or requirements",
+        "Gather relevant context (task IDs, domain info, etc.)"
+      ],
+      "validation": {
+        "requiredFlags": [
+          "intent_documented",
+          "actor_identified"
+        ]
+      },
+      "dependsOn": []
+    },
+    {
+      "id": "orchestrate-plan",
+      "title": "Orchestrate Implementation Plan",
+      "description": "Use icn_workflow tool to generate comprehensive plan",
+      "actions": [
+        "Call icn_workflow with the documented intent",
+        "Include actor and constraints in the request", 
+        "Review generated plan for completeness",
+        "Validate tool sequence and dependencies",
+        "Assess complexity and time estimates"
+      ],
+      "dependsOn": ["capture-intent"],
+      "validation": {
+        "requiredFlags": [
+          "plan_generated",
+          "dependencies_validated"
+        ]
+      }
+    },
+    {
+      "id": "review-outputs",
+      "title": "Review Orchestration Outputs",
+      "description": "Analyze the results from each orchestrated tool",
+      "actions": [
+        "Review architecture documentation gathered",
+        "Validate system invariants against plan",
+        "Check policy compliance results",
+        "Analyze suggested implementation approach",
+        "Identify any gaps or conflicts"
+      ],
+      "dependsOn": ["orchestrate-plan"],
+      "validation": {
+        "requiredFlags": [
+          "outputs_reviewed",
+          "conflicts_resolved"
+        ]
+      }
+    },
+    {
+      "id": "refine-plan",
+      "title": "Refine Implementation Plan",
+      "description": "Enhance the orchestrated plan with specific details",
+      "actions": [
+        "Break down high-level steps into specific tasks",
+        "Add detailed acceptance criteria",
+        "Identify required resources and dependencies",
+        "Set realistic timelines based on complexity",
+        "Define success metrics and validation points"
+      ],
+      "dependsOn": ["review-outputs"],
+      "validation": {
+        "requiredFlags": [
+          "plan_refined",
+          "tasks_detailed",
+          "timelines_set"
+        ]
+      }
+    },
+    {
+      "id": "execute-plan",
+      "title": "Execute Implementation",
+      "description": "Execute the refined implementation plan",
+      "actions": [
+        "Follow the policy-validated approach",
+        "Implement changes according to architecture guidance",
+        "Respect system invariants throughout development",
+        "Create checkpoints at key milestones",
+        "Validate progress against acceptance criteria"
+      ],
+      "dependsOn": ["refine-plan"],
+      "validation": {
+        "requiredFlags": [
+          "implementation_complete",
+          "validation_passed"
+        ]
+      }
+    }
+  ]
+}
