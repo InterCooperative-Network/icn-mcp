@@ -213,7 +213,7 @@ describe('ICN Tools', () => {
         expect(section).toHaveProperty('title');
         expect(section).toHaveProperty('path');
         expect(section).toHaveProperty('content');
-        expect(section.id).toMatch(/^[a-z0-9\-]+$/); // Should be lowercase with dashes
+        expect(section.id).toMatch(/^[a-z0-9-]+$/); // Should be lowercase with dashes
       });
       
       // Protocol sections should be properly structured  
@@ -222,7 +222,7 @@ describe('ICN Tools', () => {
         expect(section).toHaveProperty('title');
         expect(section).toHaveProperty('path');
         expect(section).toHaveProperty('content');
-        expect(section.id).toMatch(/^[a-z0-9\-]+$/); // Should be lowercase with dashes
+        expect(section.id).toMatch(/^[a-z0-9-]+$/); // Should be lowercase with dashes
       });
     });
   });
@@ -265,17 +265,11 @@ describe('ICN Tools', () => {
 
     it('should provide consistent file caching behavior', async () => {
       // Test that repeated calls use caching effectively
-      const start = Date.now();
       const result1 = await icnGetTaskContext({ taskId: 'cache-test' });
-      const firstCallTime = Date.now() - start;
-      
-      const start2 = Date.now();
       const result2 = await icnGetTaskContext({ taskId: 'cache-test' });
-      const secondCallTime = Date.now() - start2;
       
-      // Second call should be faster due to caching (though this is timing-dependent)
-      expect(result1).toEqual(result2);
-      // In a real scenario, secondCallTime should be significantly less than firstCallTime
+      // deterministic content check is enough
+      expect(result2).toEqual(result1);
     });
   });
 

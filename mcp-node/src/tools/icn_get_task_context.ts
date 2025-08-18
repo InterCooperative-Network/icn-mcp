@@ -1,8 +1,5 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { icnGetArchitecture } from './icn_get_architecture.js';
 import { icnGetInvariants } from './icn_get_invariants.js';
-import { DOCS_ROOT } from '../config.js';
 
 // Define canonical types with proper TypeScript interfaces
 export interface ArchitectureSection {
@@ -64,56 +61,9 @@ export interface TaskContextResponse {
   acceptance_tests: string[];
 }
 
-// Path safety and file handling utilities
-const DOC_ROOT = path.resolve(DOCS_ROOT);
-const ALLOWED_SUBDIRS = [
-  "architecture",
-  "protocols",
-  path.join("invariants", "catalog.md")
-];
 
-function resolveDocPath(rel: string): string {
-  // Normalize and ensure inside DOC_ROOT
-  const target = path.resolve(DOC_ROOT, rel);
-  if (!target.startsWith(DOC_ROOT + path.sep) && target !== DOC_ROOT) {
-    throw new Error(`Path escapes doc root: ${rel}`);
-  }
-  return target;
-}
 
-function isAllowed(rel: string): boolean {
-  // Allow exact file or subdir prefix
-  return ALLOWED_SUBDIRS.some(allowed => {
-    const fullAllowed = resolveDocPath(allowed);
-    const fullTarget = resolveDocPath(rel);
-    return fullTarget === fullAllowed || fullTarget.startsWith(fullAllowed + path.sep);
-  });
-}
 
-async function safeReadFile(filePath: string, maxBytes = 512_000): Promise<string> {
-  const stat = await fs.stat(filePath);
-  if (stat.size > maxBytes) {
-    throw new Error(`Refusing to read large doc: ${filePath} (${stat.size} bytes)`);
-  }
-  return fs.readFile(filePath, "utf8");
-}
-
-// File caching with mtime checking
-type DocCacheEntry = { mtimeMs: number; content: string };
-const docCache = new Map<string, DocCacheEntry>();
-
-async function readDocFile(relPath: string): Promise<string> {
-  if (!isAllowed(relPath)) {
-    throw new Error(`Disallowed doc path: ${relPath}`);
-  }
-  const full = resolveDocPath(relPath);
-  const stat = await fs.stat(full);
-  const hit = docCache.get(full);
-  if (hit && hit.mtimeMs === stat.mtimeMs) return hit.content;
-  const content = await safeReadFile(full);
-  docCache.set(full, { mtimeMs: stat.mtimeMs, content });
-  return content;
-}
 
 // Utility for deterministic output
 function uniqueSorted(items: string[]): string[] {
