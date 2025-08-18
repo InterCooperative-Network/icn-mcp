@@ -1,23 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { request } from 'undici';
-
-async function registerAgent(baseUrl: string): Promise<string> {
-  const res = await request(`${baseUrl}/agent/register`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ 
-      name: 'Planner A', 
-      kind: 'planner' 
-    })
-  });
-  const json = (await res.body.json()) as any;
-  if (!json?.token) {
-    throw new Error('Failed to register agent: no token received');
-  }
-  console.log('Planner registered successfully, agent ID:', json.id);
-  return json.token;
-}
+import { registerAgent, createTask } from 'agent-sdk';
 
 async function main() {
   const overviewPath = path.resolve(process.cwd(), 'docs/architecture/00-overview.md');
@@ -35,26 +18,40 @@ async function main() {
     console.log('Intent-0001 not found; proceeding with default tasks');
   }
 
-  const baseUrl = process.env.MCP_BASE_URL || 'http://localhost:8787/api';
+  const baseUrl = process.env.MCP_BASE_URL || 'http://localhost:8787';
   
-  // Register agent and get token
-  const token = await registerAgent(baseUrl);
+  // Register agent and get token using SDK
+  console.log('🤖 Registering planner agent...');
+  const registration = await registerAgent(baseUrl, {
+    name: 'Planner A',
+    kind: 'planner'
+  });
+  
+  console.log(`✅ Registered as agent ${registration.id}`);
+  const token = registration.token;
   
   const created: string[] = [];
-  for (const t of tasks) {
-    const res = await request(`${baseUrl}/task/create`, {
-      method: 'POST',
-      headers: { 
-        'content-type': 'application/json',
-        'authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ title: t.title, created_by: 'planner' })
-    });
-    const json = (await res.body.json()) as any;
-    if (json?.id) created.push(json.id);
+  for (const task of tasks) {
+    try {
+      const result = await createTask(baseUrl, token, {
+        title: task.title,
+        description: `Task created by planner: ${task.title}`
+      });
+      
+      if (result.id) {
+        created.push(result.id);
+        console.log(`📋 Created task: ${result.id} - ${task.title}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to create task "${task.title}":`, error);
+    }
   }
-  console.log('planner created tasks:', created.join(', '));
+  
+  console.log('✅ Planner completed. Created tasks:', created.join(', '));
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => { 
+  console.error('❌ Planner failed:', e); 
+  process.exit(1); 
+});
 

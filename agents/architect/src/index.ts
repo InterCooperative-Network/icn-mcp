@@ -1,4 +1,4 @@
-import { request } from 'undici';
+import { registerAgent, createPR } from 'agent-sdk';
 
 function renderDoc(): string {
   return `# Signing Context
@@ -20,18 +20,33 @@ See docs/data-models/did.md
 async function main() {
   const doc = renderDoc();
   const taskId = process.argv.includes('--task') ? process.argv[process.argv.indexOf('--task') + 1] : '';
-  const baseUrl = process.env.MCP_BASE_URL || 'http://localhost:8787/api';
+  const baseUrl = process.env.MCP_BASE_URL || 'http://localhost:8787';
+  
+  console.log('🤖 Registering architect agent...');
+  const registration = await registerAgent(baseUrl, {
+    name: 'Architect A',
+    kind: 'architect'
+  });
+  
+  console.log(`✅ Registered as agent ${registration.id}`);
+  const token = registration.token;
+  
   const file = { path: 'docs/protocols/signing-context.md', content: doc };
-  const body = {
+  const payload = {
     task_id: taskId || 'unknown-task',
     title: 'docs: add signing-context protocol skeleton',
     body: 'Initial protocol spec draft for signing context',
     files: [file]
   };
-  const res = await request(`${baseUrl}/pr/create`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const json = await res.body.json();
-  console.log('architect PR artifact:', json.artifact);
+  
+  console.log('📄 Creating PR with signing context document...');
+  const result = await createPR(baseUrl, token, payload);
+  
+  console.log('✅ Architect PR artifact:', result.artifact);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => { 
+  console.error('❌ Architect failed:', e); 
+  process.exit(1); 
+});
 
