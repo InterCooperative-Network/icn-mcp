@@ -149,12 +149,19 @@ export async function createPR(baseUrl: string, token: string, payload: PrCreate
     throw new Error(`Failed to create PR: ${response.status} ${response.statusText}`);
   }
 
-  const result = await response.json() as PrCreateResponse;
+  const result = await response.json() as any;
+  
+  // Handle policy denial (returns { allow: false, reasons: [...] })
+  if (result.allow === false) {
+    throw new Error(`PR creation denied by policy: ${result.reasons?.join(', ') || 'unknown reasons'}`);
+  }
+  
+  // Handle success (returns { ok: true, ...otherFields })
   if (!result.ok) {
     throw new Error('PR creation failed');
   }
 
-  return result;
+  return result as PrCreateResponse;
 }
 
 export * from './types.js';
