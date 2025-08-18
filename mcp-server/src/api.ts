@@ -190,6 +190,50 @@ export async function apiRoutes(f: FastifyInstance) {
     }
   });
 
+  // Administration endpoints (maintainer only)
+  f.post('/admin/agents/cleanup', { preHandler: requireAuth({ requireMaintainer: true }) }, async (req, reply) => {
+    try {
+      const deletedCount = cleanupExpiredTokens();
+      req.log.info({ 
+        reqId: req.id, 
+        deletedCount,
+        admin: req.agent?.id 
+      }, 'expired agent tokens cleaned up');
+      return reply.send({ ok: true, deletedCount });
+    } catch (err: any) {
+      f.log.error({ err, reqId: req.id }, 'admin cleanup failed');
+      return reply.code(500).send({ ok: false, error: 'cleanup_failed' });
+    }
+  });
+
+  f.get('/admin/stats', { preHandler: requireAuth({ requireMaintainer: true }) }, async (req, reply) => {
+    try {
+      const totalAgents = countAgents();
+      const { getDatabaseInfo } = await import('@/db');
+      const dbInfo = getDatabaseInfo();
+      
+      req.log.info({ 
+        reqId: req.id,
+        admin: req.agent?.id
+      }, 'admin stats accessed');
+      
+      return reply.send({
+        ok: true,
+        stats: {
+          totalAgents,
+          database: {
+            size: dbInfo.size,
+            tables: dbInfo.tables.length,
+            migrations: dbInfo.migrations.length
+          }
+        }
+      });
+    } catch (err: any) {
+      f.log.error({ err, reqId: req.id }, 'admin stats failed');
+      return reply.code(500).send({ ok: false, error: 'stats_failed' });
+    }
+  });
+
   // Workers protocol
   await workersRoute(f);
 

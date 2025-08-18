@@ -17,6 +17,8 @@
 | `/api/policy/check` | POST | Bearer required | `{"actor": string, "changedPaths": string[]}` | `{"allow": boolean, "reasons": string[]}` | Check policy compliance |
 | `/api/pr/create` | POST | Bearer required | `{"task_id": string, "title": string, "body": string, "files": Array<{"path": string, "content": string}>}` | `{"ok": true, "mode": "local\|github", ...}` | Create pull request |
 | `/api/gh/issue/create` | POST | Bearer required | `{"title": string, "body"?: string, "labels"?: string[]}` | `{"ok": true, ...}` | Create GitHub issue |
+| `/api/admin/stats` | GET | Maintainer required | None | `{"ok": true, "stats": {...}}` | Get system statistics |
+| `/api/admin/agents/cleanup` | POST | Maintainer required | `{}` | `{"ok": true, "deletedCount": number}` | Clean up expired agent tokens |
 | `/api/context/brief` | GET | No | Query: `task_id` | `TaskBrief` object | Get task context briefing |
 | `/api/webhooks/github` | POST | HMAC signature | GitHub webhook payload | `{"ok": true}` | GitHub webhook endpoint |
 
@@ -27,7 +29,40 @@
 - **No Auth**: Public endpoints accessible without authentication
 - **Bearer required**: Requires `Authorization: Bearer <token>` header
 - **Bootstrap only**: First registration allowed without auth; subsequent require Bearer token
+- **Maintainer required**: Requires maintainer token (admin or regular maintainer)
 - **HMAC signature**: Requires valid `X-Hub-Signature-256` header with WEBHOOK_SECRET
+
+### Security Features
+
+The MCP server implements comprehensive security including:
+
+- **Bearer Token Authentication**: Supports both agent tokens (dynamic, database-stored) and maintainer tokens (environment-configured)
+- **Role-Based Access Control (RBAC)**: Distinguishes between agent and maintainer roles with different permissions
+- **Rate Limiting**: Per-IP and per-token rate limits with higher limits for maintainers
+- **Audit Logging**: Comprehensive logging of authentication events, failures, and admin actions
+
+### Token Management and Expiration
+
+#### Agent Tokens
+- **Dynamic Creation**: Agent tokens are generated during registration and stored in the database
+- **Expiration**: Agent tokens automatically expire after 24 hours
+- **Refresh**: Expired tokens can be renewed using the `/api/agent/refresh` endpoint with the current (potentially expired) token
+- **Storage**: Tokens are stored hashed in the database for security
+- **Grace Period**: Expired tokens are immediately invalid with no grace window
+
+#### Maintainer Tokens
+- **Environment Configuration**: Maintainer tokens are configured via environment variables
+- **No Expiration**: Maintainer tokens do not expire automatically
+- **Two Types**: 
+  - `MAINTAINER_ADMIN_TOKEN`: Single admin token with full privileges
+  - `MAINTAINER_TOKENS`: Comma-separated list of regular maintainer tokens
+- **Rotation**: Tokens should be rotated manually by updating environment variables and restarting the server
+
+#### Token Security Best Practices
+- **Entropy**: Maintainer tokens should have high entropy (≥32 characters)
+- **Storage**: Agent tokens are stored hashed in the database (not plain text)
+- **Logging**: All authentication attempts are logged with IP addresses and user agents
+- **Rate Limiting**: Tokens are subject to rate limiting (higher limits for maintainers)
 
 ### Environment Variables
 
@@ -40,6 +75,11 @@
 | `WEBHOOK_SECRET` | - | Secret for GitHub webhook verification |
 | `MCP_DB_PATH` | `../var/icn-mcp.sqlite` | Database file path |
 | `PORT` | `8787` | Server port |
+| `MAINTAINER_ADMIN_TOKEN` | - | Admin maintainer token (highest privileges) |
+| `MAINTAINER_TOKENS` | - | Comma-separated list of regular maintainer tokens |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit window in milliseconds |
+| `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per window for agents/IPs |
+| `RATE_LIMIT_MAX_REQUESTS_MAINTAINER` | `1000` | Max requests per window for maintainers |
 
 ### Webhooks
 
