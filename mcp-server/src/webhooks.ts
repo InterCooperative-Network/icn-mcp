@@ -1,8 +1,9 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
-import { insertWebhookEvent } from '@/db';
+import { insertWebhookEvent, insertTask, getTaskById } from '@/db';
 import { analyzePr } from '@/pr-coach';
 import { webhooksInvalidSigTotal, webhooksReceivedTotal } from '@/metrics';
+import { createCommitStatus, createPullRequestComment, createIssueComment } from '@/github';
 
 function safeStringify(body: unknown): string {
   if (typeof body === 'string') return body;
@@ -28,11 +29,13 @@ function extractTaskId(payload: any): string | undefined {
       // Use safer regex: /(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/
       const match = body.match(/(\s|^)Task-ID:\s*(task_[A-Za-z0-9_-]{6,})\b/);
       if (match) {
+        console.log(`Found Task-ID: ${match[2]} in body: ${body.substring(0, 100)}...`);
         return match[2]; // Return the second capture group (the actual task ID)
       }
     }
   }
   
+  console.log('No Task-ID found in payload bodies:', possibleBodies);
   return undefined;
 }
 
@@ -99,17 +102,78 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
   }
 
   // Minimal routing skeleton (extend in future phases)
+  console.log(`Processing webhook event: ${event}, taskId: ${taskId}, action: ${action}`);
   switch (event) {
     case 'issues':
     case 'issue_comment':
     case 'pull_request': {
+      console.log(`Handling ${event} event`);
       try {
         const analysis = analyzePr(payload as any);
         if (analysis.advice.length > 0) {
           req.log.info({ advice: analysis.advice, reqId: req.id }, 'pr coaching advice');
         }
+        
+        // Create task if Task-ID is found and task doesn't exist
+        if (taskId) {
+          console.log(`Found taskId: ${taskId}, checking if exists`);
+          req.log.info({ taskId, reqId: req.id, event, action }, 'found Task-ID in webhook');
+          const existingTask = getTaskById(taskId);
+          console.log(`Existing task: ${existingTask ? 'found' : 'not found'}`);
+          if (!existingTask) {
+            console.log(`Creating new task with ID: ${taskId}`);
+            req.log.info({ taskId, reqId: req.id }, 'creating new task from webhook');
+            // Create new task based on webhook payload
+            console.log(`Generating title for event: ${event}, action: ${action}`);
+            const title = generateTaskTitle(event, action, payload);
+            console.log(`Generated title: ${title}`);
+            const description = generateTaskDescription(event, payload);
+            console.log(`Generated description length: ${description.length}`);
+            const createdBy = senderLogin || 'webhook';
+            console.log(`About to call insertTask with ID: ${taskId}`);
+            console.log(`Input object:`, { id: taskId, title, description, created_by: createdBy });
+            
+            const { id } = insertTask({ id: taskId, title, description, created_by: createdBy });
+            console.log(`Task created successfully with ID: ${id}`);
+            req.log.info({ taskId: id, reqId: req.id, event, action }, 'task created from webhook');
+            
+            // Post initial status/comment for task creation
+            // await postTaskCreationResponse(event, payload, id, req);
+          } else {
+            req.log.info({ taskId, reqId: req.id, event, action }, 'task already exists, skipping creation');
+          }
+        } else {
+          console.log(`No taskId found in event: ${event}`);
+          req.log.info({ reqId: req.id, event, action }, 'no Task-ID found in webhook payload');
+        }
       } catch (err) {
+        console.log(`Error in ${event} handler: ${err}`);
         req.log.error({ err, reqId: req.id }, 'pr coaching error');
+      }
+      break;
+    }
+    case 'push': {
+      // Handle push events specifically
+      try {
+        if (taskId) {
+          const existingTask = getTaskById(taskId);
+          if (existingTask) {
+            // Post commit status for existing task
+            const sha = payload?.after || payload?.head_commit?.id;
+            if (sha) {
+              await createCommitStatus({
+                sha,
+                state: 'pending',
+                context: 'icn-mcp/task-processing',
+                description: `Processing task ${taskId}`,
+                target_url: undefined
+              });
+              req.log.info({ taskId, sha, reqId: req.id }, 'commit status posted for task');
+            }
+          }
+        }
+      } catch (err) {
+        req.log.error({ err, reqId: req.id }, 'push event processing error');
       }
       break;
     }
@@ -122,6 +186,96 @@ export async function handleGitHubWebhook(req: FastifyRequest, reply: FastifyRep
   }
 
   return reply.code(200).send({ ok: true });
+}
+
+// Helper functions for task generation and GitHub responses
+function generateTaskTitle(event: string | undefined, action: string | undefined, payload: any): string {
+  const prefix = `[${event?.toUpperCase()}]`;
+  
+  switch (event) {
+    case 'issues':
+      return `${prefix} ${payload?.issue?.title || 'Issue processing'}`;
+    case 'pull_request':
+      return `${prefix} ${payload?.pull_request?.title || 'PR processing'}`;
+    case 'issue_comment':
+      return `${prefix} Comment on: ${payload?.issue?.title || 'Unknown issue'}`;
+    default:
+      return `${prefix} ${action || 'Event'} processing`;
+  }
+}
+
+function generateTaskDescription(event: string | undefined, payload: any): string {
+  const repoName = payload?.repository?.full_name || 'Unknown repository';
+  const sender = payload?.sender?.login || 'Unknown user';
+  
+  let description = `Automated task created from ${event} event in ${repoName} by ${sender}.\n\n`;
+  
+  switch (event) {
+    case 'issues':
+      description += `Issue: ${payload?.issue?.title}\n`;
+      description += `URL: ${payload?.issue?.html_url}\n`;
+      if (payload?.issue?.body) {
+        description += `\nIssue body:\n${payload.issue.body}`;
+      }
+      break;
+    case 'pull_request':
+      description += `Pull Request: ${payload?.pull_request?.title}\n`;
+      description += `URL: ${payload?.pull_request?.html_url}\n`;
+      if (payload?.pull_request?.body) {
+        description += `\nPR body:\n${payload.pull_request.body}`;
+      }
+      break;
+    case 'issue_comment':
+      description += `Comment on: ${payload?.issue?.title}\n`;
+      description += `Issue URL: ${payload?.issue?.html_url}\n`;
+      description += `Comment URL: ${payload?.comment?.html_url}\n`;
+      if (payload?.comment?.body) {
+        description += `\nComment:\n${payload.comment.body}`;
+      }
+      break;
+    default:
+      description += `Event data: ${JSON.stringify(payload, null, 2)}`;
+  }
+  
+  return description;
+}
+
+async function postTaskCreationResponse(event: string | undefined, payload: any, taskId: string, req: FastifyRequest): Promise<void> {
+  try {
+    const responseMessage = `✅ Task ${taskId} has been created and will be processed by ICN MCP agents.`;
+    
+    switch (event) {
+      case 'issues':
+        if (payload?.issue?.number) {
+          await createIssueComment({
+            issue_number: payload.issue.number,
+            body: responseMessage
+          });
+          req.log.info({ taskId, issueNumber: payload.issue.number }, 'issue comment posted');
+        }
+        break;
+      case 'pull_request':
+        if (payload?.pull_request?.number) {
+          await createPullRequestComment({
+            pull_number: payload.pull_request.number,
+            body: responseMessage
+          });
+          req.log.info({ taskId, prNumber: payload.pull_request.number }, 'PR comment posted');
+        }
+        break;
+      case 'issue_comment':
+        if (payload?.issue?.number) {
+          await createIssueComment({
+            issue_number: payload.issue.number,
+            body: responseMessage
+          });
+          req.log.info({ taskId, issueNumber: payload.issue.number }, 'issue comment reply posted');
+        }
+        break;
+    }
+  } catch (err) {
+    req.log.error({ err, taskId, event }, 'failed to post task creation response');
+  }
 }
 
 export async function webhooksRoute(f: FastifyInstance) {

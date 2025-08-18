@@ -206,17 +206,27 @@ function generateId(prefix: string): string {
   return `${prefix}_${now}_${rand}`;
 }
 
-export function insertTask(input: InsertTaskInput): { id: string } {
+export function insertTask(input: InsertTaskInput & { id?: string }): { id: string } {
   const db = getDb();
-  const id = generateId('task');
+  const id = input.id || generateId('task');
+  
+  console.log(`insertTask called with input:`, input);
+  console.log(`Using ID: ${id} (input.id was: ${input.id})`);
   
   return withWriteTransaction(db, () => {
     const stmt = db.prepare(
       "INSERT INTO tasks (id, title, description, status, created_by) VALUES (?, ?, ?, ?, ?)"
     );
+    console.log(`Running SQL: INSERT INTO tasks with values: ${id}, ${input.title}, ${input.description}, open, ${input.created_by}`);
     stmt.run(id, input.title, input.description ?? null, 'open', input.created_by ?? null);
+    console.log(`Task inserted successfully with ID: ${id}`);
     return { id };
   });
+}
+
+// Keep the explicit version for clarity
+export function insertTaskWithId(input: InsertTaskInput & { id: string }): { id: string } {
+  return insertTask(input);
 }
 
 export function listTasks(): TaskRow[] {
