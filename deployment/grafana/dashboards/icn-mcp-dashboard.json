@@ -1,0 +1,156 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "ICN MCP Server Dashboard",
+    "tags": ["icn", "mcp"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "5s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"icn-mcp-server\"}",
+            "legendFormat": "Server Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "green", "value": 1 }
+              ]
+            },
+            "mappings": [
+              { "options": { "0": { "text": "DOWN" } } },
+              { "options": { "1": { "text": "UP" } } }
+            ]
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "Total Tasks",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "icn_mcp_tasks_total",
+            "legendFormat": "Tasks"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 }
+      },
+      {
+        "id": 3,
+        "title": "Active Agents",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "icn_mcp_agents_total",
+            "legendFormat": "Agents"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 }
+      },
+      {
+        "id": 4,
+        "title": "PR Creates",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "icn_mcp_pr_creates_total",
+            "legendFormat": "PRs"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 }
+      },
+      {
+        "id": 5,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_user_seconds_total[5m])",
+            "legendFormat": "CPU Usage"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+      },
+      {
+        "id": 6,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes",
+            "legendFormat": "Memory (bytes)"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+      },
+      {
+        "id": 7,
+        "title": "Task Claims Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(icn_mcp_claims_total[5m])",
+            "legendFormat": "Claims/sec"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+      },
+      {
+        "id": 8,
+        "title": "Webhook Events",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(icn_mcp_webhooks_received_total[5m])",
+            "legendFormat": "Webhooks/sec"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+      },
+      {
+        "id": 9,
+        "title": "Policy Denies",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "icn_mcp_policy_denies_total",
+            "legendFormat": "Policy Denies"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 }
+      }
+    ]
+  }
+}

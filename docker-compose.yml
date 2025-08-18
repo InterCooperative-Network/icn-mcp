@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build: .
+    container_name: icn-mcp-server
+    ports:
+      - "8787:8787"
+    environment:
+      - NODE_ENV=production
+      - PORT=8787
+      - MCP_DB_DIR=/app/var
+      - REPO_ROOT=/app
+      - LOG_LEVEL=info
+      # GitHub configuration (override in .env)
+      - GITHUB_OWNER=${GITHUB_OWNER:-InterCooperative-Network}
+      - GITHUB_REPO=${GITHUB_REPO:-icn-mcp}
+      - GITHUB_DEFAULT_BRANCH=${GITHUB_DEFAULT_BRANCH:-main}
+      # Optional GitHub token for API access
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Rate limiting
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      # Admin tokens (override in .env)
+      - MAINTAINER_ADMIN_TOKEN=${MAINTAINER_ADMIN_TOKEN:-}
+      - MAINTAINER_TOKENS=${MAINTAINER_TOKENS:-}
+    volumes:
+      - mcp-data:/app/var
+      - mcp-logs:/app/logs
+    networks:
+      - icn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8787/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: icn-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./deployment/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - icn-network
+    restart: unless-stopped
+    depends_on:
+      - mcp-server
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: icn-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployment/grafana:/etc/grafana/provisioning:ro
+    networks:
+      - icn-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  mcp-data:
+    driver: local
+  mcp-logs:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  icn-network:
+    driver: bridge

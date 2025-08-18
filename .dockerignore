@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.github
+
+# Documentation
+*.md
+docs/
+
+# Development
+.vscode
+.cursor
+.env*
+!.env.example
+
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Runtime
+var/
+logs/
+*.log
+*.sqlite*
+
+# Test files
+test/
+*.test.*
+coverage/
+
+# Build artifacts
+# dist/  # Keep dist for Docker builds
+*.tsbuildinfo
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
