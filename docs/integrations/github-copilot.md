@@ -13,6 +13,9 @@ The ICN MCP server exposes key tools and resources that provide GitHub Copilot w
 - **icn_check_policy**: Validate changes against ICN policies
 - **icn_get_task_context**: Get full task briefings with requirements and constraints
 - **icn_workflow**: Orchestrate multiple tools to produce actionable plans from intents
+- **icn_display_tools**: Display available tools with descriptions, categories, and risk levels for transparency
+- **icn_request_consent**: Request user consent before executing potentially impactful actions
+- **icn_report_progress**: Report execution progress and provide status updates for transparency
 
 ### Resources
 
@@ -323,6 +326,45 @@ icn_get_task_context({taskId: "TASK-123"})
 ```
 
 This provides comprehensive guidance including coding conventions, test patterns, and policy constraints.
+
+### Discovering Available Tools
+
+To see all available tools with their descriptions and risk levels:
+
+```
+icn_display_tools()
+```
+
+This returns categorized tools with risk assessments and usage information, helping users understand what capabilities are available.
+
+### Requesting User Consent
+
+For tools that require user permission:
+
+```
+icn_request_consent({
+  toolName: "icn_write_patch",
+  toolArgs: { files: ["src/new-feature.ts"] },
+  context: "Adding new MCP tool functionality"
+})
+```
+
+This displays a formatted consent prompt with risk assessment and impact details, ensuring user transparency and control.
+
+### Tracking Progress
+
+For long-running operations:
+
+```
+icn_report_progress({
+  toolName: "icn_run_tests", 
+  phase: "execution",
+  progress: 60,
+  message: "Running integration tests..."
+})
+```
+
+This provides real-time progress updates with visual indicators, keeping users informed during tool execution.
 
 ### Orchestrating Complex Planning
 

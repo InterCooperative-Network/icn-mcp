@@ -1,4 +1,5 @@
 import { ICNPrompt } from './types.js';
+import { consentPrompts } from './consent.js';
 
 /**
  * Code review prompt template that instructs the model on reviewing code changes
@@ -417,6 +418,7 @@ export const ICN_PROMPTS: ICNPrompt[] = [
   adrTemplatePrompt,
   releaseNotesPrompt,
   governanceProposalPrompt,
+  ...consentPrompts,
 ];
 
 /**

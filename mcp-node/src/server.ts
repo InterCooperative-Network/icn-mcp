@@ -54,6 +54,9 @@ import { icnRunTests } from './tools/icn_run_tests.js';
 import { icnRunLinters } from './tools/icn_run_linters.js';
 import { icnGeneratePRPatch } from './tools/icn_generate_pr_patch.js';
 import { icnExplainTestFailures } from './tools/icn_explain_test_failures.js';
+import { icnDisplayTools } from './tools/icn_display_tools.js';
+import { icnRequestConsent, icnProcessConsent } from './tools/icn_request_consent.js';
+import { icnReportProgress, icnGetProgressHistory } from './tools/icn_progress.js';
 import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/index.js';
 
 class ICNMCPServer {
@@ -906,6 +909,66 @@ class ICNMCPServer {
               testType,
               testCommand,
               context
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_display_tools': {
+            const category = typeof args?.category === 'string' ? args.category : undefined;
+            const result = await executeWithTimeout(() => icnDisplayTools({ category }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_request_consent': {
+            if (!args?.toolName || typeof args.toolName !== 'string') {
+              throw new Error('toolName parameter is required and must be a string');
+            }
+            const toolArgs = args.toolArgs;
+            const context = typeof args.context === 'string' ? args.context : undefined;
+            
+            const result = await executeWithTimeout(() => icnRequestConsent({
+              toolName: args.toolName as string,
+              toolArgs,
+              context
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_report_progress': {
+            if (!args?.toolName || typeof args.toolName !== 'string' || 
+                typeof args?.progress !== 'number' || !args?.message) {
+              throw new Error('toolName, progress, and message parameters are required');
+            }
+            const phase = typeof args.phase === 'string' ? args.phase : undefined;
+            const details = args.details;
+            
+            const result = await executeWithTimeout(() => icnReportProgress({
+              toolName: args.toolName as string,
+              phase: phase || 'executing',
+              progress: args.progress as number,
+              message: args.message as string,
+              details
             }));
             return {
               content: [
