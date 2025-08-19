@@ -55,8 +55,8 @@ import { icnRunLinters } from './tools/icn_run_linters.js';
 import { icnGeneratePRPatch } from './tools/icn_generate_pr_patch.js';
 import { icnExplainTestFailures } from './tools/icn_explain_test_failures.js';
 import { icnDisplayTools } from './tools/icn_display_tools.js';
-import { icnRequestConsent, icnProcessConsent } from './tools/icn_request_consent.js';
-import { icnReportProgress, icnGetProgressHistory } from './tools/icn_progress.js';
+import { icnRequestConsent } from './tools/icn_request_consent.js';
+import { icnReportProgress } from './tools/icn_progress.js';
 import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/index.js';
 
 class ICNMCPServer {

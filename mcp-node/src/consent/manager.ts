@@ -166,7 +166,7 @@ export class ConsentManager {
     };
   }
 
-  private assessRiskLevel(toolName: string, args: any): 'low' | 'medium' | 'high' {
+  private assessRiskLevel(toolName: string, _args: any): 'low' | 'medium' | 'high' {
     // High risk tools that modify files or run commands
     if (toolName.includes('write') || toolName.includes('patch') || 
         toolName.includes('run') || toolName.includes('generate_pr')) {
@@ -195,16 +195,16 @@ export class ConsentManager {
     return timeEstimates[toolName] || '< 30 seconds';
   }
 
-  private analyzeArguments(toolName: string, args: any): Partial<ConsentRequest['details']> {
+  private analyzeArguments(toolName: string, _args: any): Partial<ConsentRequest['details']> {
     const result: Partial<ConsentRequest['details']> = {};
     
     // Analyze file-related arguments
-    if (args?.files) {
-      result.filesToRead = Array.isArray(args.files) ? args.files : [args.files];
+    if (_args?.files) {
+      result.filesToRead = Array.isArray(_args.files) ? _args.files : [_args.files];
     }
     
-    if (args?.changeset) {
-      result.filesToModify = Array.isArray(args.changeset) ? args.changeset : [args.changeset];
+    if (_args?.changeset) {
+      result.filesToModify = Array.isArray(_args.changeset) ? _args.changeset : [_args.changeset];
     }
     
     // Analyze external calls

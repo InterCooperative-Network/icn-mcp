@@ -86,7 +86,7 @@ export async function icnReportProgress(args: ProgressArgs): Promise<ProgressRes
 /**
  * Get recent progress updates for a tool
  */
-export async function icnGetProgressHistory(args: { toolName?: string; limit?: number }) {
+export async function icnGetProgressHistory(_args: { toolName?: string; limit?: number }) {
   // In a real implementation, this would retrieve from a persistent store
   // For now, return a mock response showing the capability
   
