@@ -7,6 +7,8 @@ import {
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import fs from 'node:fs/promises';
 import { accessSync } from 'node:fs';
@@ -42,6 +44,7 @@ import { icnBuildGovernanceFlow } from './tools/icn_build_governance_flow.js';
 import { icnAdviseVoting } from './tools/icn_advise_voting.js';
 import { icnManageSortition } from './tools/icn_manage_sortition.js';
 import { icnBuildPolicy } from './tools/icn_build_policy.js';
+import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/index.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -57,12 +60,14 @@ class ICNMCPServer {
         capabilities: {
           tools: {},
           resources: {},
+          prompts: {},
         },
       }
     );
 
     this.setupToolHandlers();
     this.setupResourceHandlers();
+    this.setupPromptHandlers();
     this.setupErrorHandling();
   }
 
@@ -933,6 +938,52 @@ class ICNMCPServer {
 
   private getPolicyRulesPath(): string {
     return path.join(this.getRepoRoot(), 'mcp-server', 'policy.rules.json');
+  }
+
+  private setupPromptHandlers() {
+    // List available prompts
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      const prompts = listAllPrompts().map(prompt => ({
+        name: prompt.name,
+        description: prompt.description,
+        arguments: prompt.arguments.map(arg => ({
+          name: arg.name,
+          description: arg.description,
+          required: arg.required ?? false,
+        })),
+      }));
+      return { prompts };
+    });
+
+    // Get specific prompt
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      
+      // Validate prompt exists
+      const promptMeta = getPromptMetadata(name);
+      if (!promptMeta) {
+        throw new Error(`Prompt '${name}' not found`);
+      }
+
+      // Generate prompt with provided arguments
+      const result = generatePrompt(name, args || {});
+      if (!result.success) {
+        throw new Error(`Failed to generate prompt: ${result.errors?.join(', ')}`);
+      }
+
+      return {
+        description: promptMeta.description,
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: result.content!,
+            },
+          },
+        ],
+      };
+    });
   }
 
   private setupErrorHandling() {
