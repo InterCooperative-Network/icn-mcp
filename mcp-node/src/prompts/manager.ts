@@ -8,9 +8,15 @@ import { ICN_PROMPTS, getPromptByName } from './templates.js';
 export function interpolateTemplate(template: string, variables: Record<string, any>): string {
   let result = template;
   
+  // Add built-in variables
+  const allVariables = {
+    ...variables,
+    currentDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+  };
+  
   // Handle conditional blocks with else first: {{#if variable}}content{{else}}alternative{{/if}}
   result = result.replace(/{{#if\s+(\w+)}}([\s\S]*?){{else}}([\s\S]*?){{\/if}}/g, (match, varName, ifContent, elseContent) => {
-    const value = variables[varName];
+    const value = allVariables[varName];
     if (value && value !== '' && value !== null && value !== undefined) {
       return ifContent;
     }
@@ -19,7 +25,7 @@ export function interpolateTemplate(template: string, variables: Record<string, 
   
   // Handle conditional blocks without else: {{#if variable}}content{{/if}}
   result = result.replace(/{{#if\s+(\w+)}}([\s\S]*?){{\/if}}/g, (match, varName, content) => {
-    const value = variables[varName];
+    const value = allVariables[varName];
     if (value && value !== '' && value !== null && value !== undefined) {
       return content;
     }
@@ -28,7 +34,7 @@ export function interpolateTemplate(template: string, variables: Record<string, 
   
   // Handle simple variable substitution: {{variable}}
   result = result.replace(/{{(\w+)}}/g, (match, varName) => {
-    const value = variables[varName];
+    const value = allVariables[varName];
     return value !== undefined ? String(value) : match;
   });
   

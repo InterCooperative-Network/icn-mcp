@@ -16,7 +16,7 @@ export const ICNPromptSchema = z.object({
   name: z.string(),
   description: z.string(),
   arguments: z.array(PromptArgumentSchema).optional().default([]),
-  category: z.enum(['workflow', 'documentation', 'review']),
+  category: z.enum(['workflow', 'documentation', 'review', 'governance']),
   template: z.string(),
 });
 
@@ -30,6 +30,6 @@ export interface PromptTemplate {
   name: string;
   description: string;
   arguments: ICNPromptArgument[];
-  category: 'workflow' | 'documentation' | 'review';
+  category: 'workflow' | 'documentation' | 'review' | 'governance';
   content: string;
 }

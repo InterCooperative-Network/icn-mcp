@@ -14,12 +14,13 @@ describe('ICN Prompts', () => {
   describe('Template Management', () => {
     it('should have all required prompt templates', () => {
       const prompts = ICN_PROMPTS;
-      expect(prompts).toHaveLength(3);
+      expect(prompts).toHaveLength(4);
       
       const promptNames = prompts.map(p => p.name);
       expect(promptNames).toContain('code-review');
       expect(promptNames).toContain('adr-template');
       expect(promptNames).toContain('release-notes');
+      expect(promptNames).toContain('governance-proposal');
     });
 
     it('should return prompt by name', () => {
@@ -44,6 +45,10 @@ describe('ICN Prompts', () => {
       const workflowPrompts = getPromptsByCategory('workflow');
       expect(workflowPrompts).toHaveLength(1);
       expect(workflowPrompts[0].name).toBe('release-notes');
+
+      const governancePrompts = getPromptsByCategory('governance');
+      expect(governancePrompts).toHaveLength(1);
+      expect(governancePrompts[0].name).toBe('governance-proposal');
     });
   });
 
@@ -64,7 +69,7 @@ describe('ICN Prompts', () => {
 
     it('should list all prompts with full templates', () => {
       const allPrompts = listAllPrompts();
-      expect(allPrompts).toHaveLength(3);
+      expect(allPrompts).toHaveLength(4);
       
       for (const prompt of allPrompts) {
         expect(prompt.name).toBeDefined();
@@ -263,6 +268,151 @@ describe('ICN Prompts', () => {
       expect(result.content).toContain('ICN Protocol Updates');
       expect(result.content).toContain('ICN invariants');
       expect(result.content).toContain('cooperative principles');
+    });
+
+    it('should include democratic principles in governance proposal', () => {
+      const result = generatePrompt('governance-proposal', {
+        title: 'Test Proposal',
+        proposer: 'Alice'
+      });
+      
+      expect(result.content).toContain('Democratic Governance');
+      expect(result.content).toContain('Event-Sourced');
+      expect(result.content).toContain('Non-Transferable Credits');
+      expect(result.content).toContain('Anti-Token-Voting');
+      expect(result.content).toContain('Federation Autonomy');
+      expect(result.content).toContain('Cooperative Values');
+    });
+  });
+
+  describe('Invariant Violation Detection', () => {
+    it('should prompt for checking token-based voting violations in code review', () => {
+      const tokenVotingCode = `
++ function buyVotingPower(tokens) {
++   return tokens * VOTING_MULTIPLIER;
++ }
++ const votingPower = user.tokenBalance * votingWeight;
+      `;
+
+      const result = generatePrompt('code-review', {
+        changes: tokenVotingCode,
+        context: 'Adding token-weighted voting system'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('No token-bought voting mechanisms');
+      expect(result.content).toContain('Are there any centralization risks?');
+      expect(result.content).toContain('democratic governance principles');
+    });
+
+    it('should detect centralization patterns in code review', () => {
+      const centralizationCode = `
++ if (user.role === 'ADMIN') {
++   return allowUnrestrictedAccess();
++ }
++ const privilegedUsers = ['admin', 'superuser', 'owner'];
+      `;
+
+      const result = generatePrompt('code-review', {
+        changes: centralizationCode,
+        context: 'Adding administrative privileges'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('centralization risks');
+      expect(result.content).toContain('Democratic governance');
+      expect(result.content).toContain('proper authorization/policy checking');
+    });
+
+    it('should validate non-deterministic operations in code review', () => {
+      const nonDeterministicCode = `
++ const randomSeed = Math.random();
++ const votingDeadline = Date.now() + Math.random() * 86400000;
++ if (Math.random() > 0.5) { processVote(); }
+      `;
+
+      const result = generatePrompt('code-review', {
+        changes: nonDeterministicCode,
+        context: 'Adding randomized voting logic'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('Deterministic operations');
+      expect(result.content).toContain('Is the implementation deterministic?');
+    });
+
+    it('should check event sourcing violations in code review', () => {
+      const eventSourcingViolation = `
++ database.users.update({ id: userId }, { $set: { balance: newBalance } });
++ delete user.previousVotes;
++ user.votingHistory = []; // Clear history
+      `;
+
+      const result = generatePrompt('code-review', {
+        changes: eventSourcingViolation,
+        context: 'Updating user data directly'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('Event-sourced architecture');
+      expect(result.content).toContain('event-sourced patterns');
+    });
+
+    it('should detect coordination credit transferability violations', () => {
+      const transferableCredits = `
++ function transferCredits(from, to, amount) {
++   from.coordinationCredits -= amount;
++   to.coordinationCredits += amount;
++ }
++ const creditMarket = new TokenMarket(coordinationCredits);
+      `;
+
+      const result = generatePrompt('code-review', {
+        changes: transferableCredits,
+        context: 'Adding credit transfer functionality'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('Non-transferable coordination credits');
+      expect(result.content).toContain('No token-bought voting');
+    });
+  });
+
+  describe('Template Engine Features', () => {
+    it('should support built-in currentDate variable', () => {
+      const result = generatePrompt('governance-proposal', {
+        title: 'Test Proposal',
+        proposer: 'Alice'
+      });
+
+      expect(result.success).toBe(true);
+      const today = new Date().toISOString().split('T')[0];
+      expect(result.content).toContain(`**Date:** ${today}`);
+    });
+
+    it('should handle missing optional arguments gracefully', () => {
+      const result = generatePrompt('governance-proposal', {
+        title: 'Minimal Proposal',
+        proposer: 'Bob'
+        // federationScope and economicImpact omitted
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).not.toContain('**Scope:**');
+      expect(result.content).not.toContain('## Economic Impact Assessment');
+    });
+
+    it('should render conditional economic impact section', () => {
+      const result = generatePrompt('governance-proposal', {
+        title: 'Economic Policy Change',
+        proposer: 'Charlie',
+        economicImpact: 'significant'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('## Economic Impact Assessment');
+      expect(result.content).toContain('### Mana/Coordination Credit Effects');
+      expect(result.content).toContain('### Federation Impact');
     });
   });
 });
