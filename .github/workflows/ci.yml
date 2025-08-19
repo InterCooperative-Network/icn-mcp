@@ -80,7 +80,7 @@ jobs:
           context: .
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: ${{ steps.meta.outputs.tags }},icn-mcp:latest
+          tags: ${{ steps.meta.outputs.tags }}${{ github.event_name == 'pull_request' && ',icn-mcp:latest' || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -119,10 +119,17 @@ jobs:
           java-db-repository: ghcr.io/aquasecurity/trivy-java-db:1
 
       - name: Verify image is present
-        run: docker image inspect icn-mcp:latest >/dev/null
+        id: have_image
+        run: |
+          if docker image inspect icn-mcp:latest >/dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Trivy Image scan (online try)
         id: trivy-online
+        if: steps.have_image.outputs.present == 'true'
         continue-on-error: true
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -137,7 +144,7 @@ jobs:
           timeout: 10m
 
       - name: Trivy Image scan (offline fallback)
-        if: failure()
+        if: steps.have_image.outputs.present == 'true' && failure()
         uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: image
@@ -146,7 +153,6 @@ jobs:
           output: trivy-image.sarif
           ignore-unfixed: true
           vuln-type: os,library
-          skip-db-update: true
 
       - name: Upload Trivy FS SARIF
         uses: github/codeql-action/upload-sarif@v3
