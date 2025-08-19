@@ -5,7 +5,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import fs from 'node:fs/promises';
+import { accessSync } from 'node:fs';
+import path from 'node:path';
 
 import { generateToolManifest } from './manifest.js';
 import { icnGetArchitecture } from './tools/icn_get_architecture.js';
@@ -51,11 +56,13 @@ class ICNMCPServer {
       {
         capabilities: {
           tools: {},
+          resources: {},
         },
       }
     );
 
     this.setupToolHandlers();
+    this.setupResourceHandlers();
     this.setupErrorHandling();
   }
 
@@ -722,6 +729,210 @@ class ICNMCPServer {
         };
       }
     });
+  }
+
+  private setupResourceHandlers() {
+    // List available resources
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      const resources = await this.listResources();
+      return { resources };
+    });
+
+    // Handle resource reads
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+      const contents = await this.readResource(uri);
+      return { contents };
+    });
+  }
+
+  private async listResources() {
+    const resources = [];
+    
+    try {
+      // Add documentation resources
+      const docsRoot = this.getDocsRoot();
+      
+      // Architecture documentation
+      const archDir = path.join(docsRoot, 'architecture');
+      try {
+        const archFiles = await fs.readdir(archDir);
+        for (const file of archFiles) {
+          if (file.endsWith('.md')) {
+            resources.push({
+              uri: `icn://docs/architecture/${file}`,
+              name: `Architecture: ${file}`,
+              description: `ICN architecture documentation from ${file}`,
+              mimeType: 'text/markdown'
+            });
+          }
+        }
+      } catch (error) {
+        // Directory might not exist, continue
+      }
+
+      // Invariants documentation
+      const invariantsDir = path.join(docsRoot, 'invariants');
+      try {
+        const invFiles = await fs.readdir(invariantsDir);
+        for (const file of invFiles) {
+          if (file.endsWith('.md')) {
+            resources.push({
+              uri: `icn://docs/invariants/${file}`,
+              name: `Invariants: ${file}`,
+              description: `ICN system invariants from ${file}`,
+              mimeType: 'text/markdown'
+            });
+          }
+        }
+      } catch (error) {
+        // Directory might not exist, continue
+      }
+
+      // Policy rules
+      const policyPath = this.getPolicyRulesPath();
+      try {
+        await fs.access(policyPath);
+        resources.push({
+          uri: `icn://policy/rules.json`,
+          name: 'Policy Rules',
+          description: 'ICN policy rules configuration for access control and code review requirements',
+          mimeType: 'application/json'
+        });
+      } catch (error) {
+        // File might not exist, continue
+      }
+
+      // CODEOWNERS file
+      const codeownersPath = path.join(this.getRepoRoot(), 'CODEOWNERS');
+      try {
+        await fs.access(codeownersPath);
+        resources.push({
+          uri: `icn://CODEOWNERS`,
+          name: 'CODEOWNERS',
+          description: 'GitHub CODEOWNERS file specifying code ownership and review requirements',
+          mimeType: 'text/plain'
+        });
+      } catch (error) {
+        // File might not exist, continue
+      }
+
+      // Recent logs (placeholder - in a real implementation this would read actual logs)
+      resources.push({
+        uri: `icn://logs/recent`,
+        name: 'Recent Logs',
+        description: 'Recent system and task execution logs for debugging',
+        mimeType: 'text/plain'
+      });
+
+    } catch (error) {
+      console.error('[MCP Resources] Error listing resources:', error);
+    }
+
+    return resources;
+  }
+
+  private async readResource(uri: string) {
+    try {
+      if (uri.startsWith('icn://docs/architecture/')) {
+        const filename = uri.replace('icn://docs/architecture/', '');
+        const filePath = path.join(this.getDocsRoot(), 'architecture', filename);
+        const content = await fs.readFile(filePath, 'utf-8');
+        return [{
+          uri,
+          mimeType: 'text/markdown',
+          text: content
+        }];
+      }
+
+      if (uri.startsWith('icn://docs/invariants/')) {
+        const filename = uri.replace('icn://docs/invariants/', '');
+        const filePath = path.join(this.getDocsRoot(), 'invariants', filename);
+        const content = await fs.readFile(filePath, 'utf-8');
+        return [{
+          uri,
+          mimeType: 'text/markdown',
+          text: content
+        }];
+      }
+
+      if (uri === 'icn://policy/rules.json') {
+        const content = await fs.readFile(this.getPolicyRulesPath(), 'utf-8');
+        return [{
+          uri,
+          mimeType: 'application/json',
+          text: content
+        }];
+      }
+
+      if (uri === 'icn://CODEOWNERS') {
+        const content = await fs.readFile(path.join(this.getRepoRoot(), 'CODEOWNERS'), 'utf-8');
+        return [{
+          uri,
+          mimeType: 'text/plain',
+          text: content
+        }];
+      }
+
+      if (uri === 'icn://logs/recent') {
+        // In a real implementation, this would read actual logs
+        // For now, return a placeholder
+        const content = 'Recent logs placeholder - implement actual log reading based on your logging infrastructure';
+        return [{
+          uri,
+          mimeType: 'text/plain',
+          text: content
+        }];
+      }
+
+      throw new Error(`Resource not found: ${uri}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error reading resource';
+      return [{
+        uri,
+        mimeType: 'text/plain',
+        text: `Error reading resource: ${errorMessage}`
+      }];
+    }
+  }
+
+  private getRepoRoot(): string {
+    // Try to find the repo root by looking for package.json or .git
+    let current = process.cwd();
+    
+    while (current !== path.dirname(current)) {
+      try {
+        const packageJson = path.join(current, 'package.json');
+        const gitDir = path.join(current, '.git');
+        
+        // Use accessSync to check existence
+        try {
+          accessSync(packageJson);
+          return current;
+        } catch {
+          try {
+            accessSync(gitDir);
+            return current;
+          } catch {
+            // Continue searching if neither exists
+          }
+        }
+      } catch (error) {
+        // Continue searching
+      }
+      current = path.dirname(current);
+    }
+    
+    // Fallback to current working directory
+    return process.cwd();
+  }
+
+  private getDocsRoot(): string {
+    return path.join(this.getRepoRoot(), 'docs');
+  }
+
+  private getPolicyRulesPath(): string {
+    return path.join(this.getRepoRoot(), 'mcp-server', 'policy.rules.json');
   }
 
   private setupErrorHandling() {
