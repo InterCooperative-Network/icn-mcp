@@ -94,6 +94,19 @@ jobs:
           dockerfile: Dockerfile
           failure-threshold: warning
 
+      - name: Compute weekly cache key
+        id: week
+        run: echo "key=trivy-${{ runner.os }}-$(date +%Y-%V)" >> $GITHUB_OUTPUT
+
+      - name: Cache Trivy DB
+        id: trivy-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/trivy
+            ~/.cache/trivy-java
+          key: ${{ steps.week.outputs.key }}
+
       - name: Trivy FS scan (SARIF)
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -101,14 +114,39 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           ignore-unfixed: true
+          vuln-type: os,library
+          db-repository: ghcr.io/aquasecurity/trivy-db:2
+          java-db-repository: ghcr.io/aquasecurity/trivy-java-db:1
 
-      - name: Trivy Image scan (SARIF)
+      - name: Verify image is present
+        run: docker image inspect icn-mcp:latest >/dev/null
+
+      - name: Trivy Image scan (online try)
+        id: trivy-online
+        continue-on-error: true
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: 'icn-mcp:latest'
-          format: 'sarif'
-          output: 'trivy-image.sarif'
+          scan-type: image
+          image-ref: icn-mcp:latest
+          format: sarif
+          output: trivy-image.sarif
           ignore-unfixed: true
+          vuln-type: os,library
+          db-repository: ghcr.io/aquasecurity/trivy-db:2
+          java-db-repository: ghcr.io/aquasecurity/trivy-java-db:1
+          timeout: 10m
+
+      - name: Trivy Image scan (offline fallback)
+        if: failure()
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: image
+          image-ref: icn-mcp:latest
+          format: sarif
+          output: trivy-image.sarif
+          ignore-unfixed: true
+          vuln-type: os,library
+          skip-db-update: true
 
       - name: Upload Trivy FS SARIF
         uses: github/codeql-action/upload-sarif@v3
