@@ -186,9 +186,18 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   f.get('/workflow/:workflowId', {
     preHandler: requireAuth(),
     schema: {
-      params: z.object({
-        workflowId: z.string().min(8).max(64).regex(/^[a-z0-9-]+$/)
-      }).strict()
+      params: {
+        type: 'object',
+        properties: {
+          workflowId: {
+            type: 'string',
+            minLength: 8,
+            maxLength: 64,
+            pattern: '^[a-z0-9-]+$'
+          }
+        },
+        required: ['workflowId']
+      }
     }
   }, async (req, reply) => {
     try {
@@ -224,9 +233,18 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   f.get('/workflow/:workflowId/next-step', {
     preHandler: requireAuth(),
     schema: {
-      params: z.object({
-        workflowId: z.string().min(8).max(64).regex(/^[a-z0-9-]+$/)
-      }).strict()
+      params: {
+        type: 'object',
+        properties: {
+          workflowId: {
+            type: 'string',
+            minLength: 8,
+            maxLength: 64,
+            pattern: '^[a-z0-9-]+$'
+          }
+        },
+        required: ['workflowId']
+      }
     }
   }, async (req, reply) => {
     try {
@@ -253,10 +271,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
 
   // Create checkpoint
   f.post('/workflow/checkpoint', { 
-    preHandler: requireAuth(),
-    schema: {
-      body: CreateCheckpointRequest
-    }
+    preHandler: requireAuth()
   }, async (req, reply) => {
     try {
       const body = CreateCheckpointRequest.parse(req.body);
@@ -323,10 +338,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
 
   // Complete workflow step - forces completeStep=true server-side
   f.post('/workflow/complete-step', { 
-    preHandler: requireAuth(),
-    schema: {
-      body: CompleteStepRequest
-    }
+    preHandler: requireAuth()
   }, async (req, reply) => {
     try {
       const body = CompleteStepRequest.parse(req.body);
@@ -393,10 +405,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
 
   // Orchestrate ad-hoc intents
   f.post('/workflow/orchestrate', { 
-    preHandler: requireAuth(),
-    schema: {
-      body: OrchestrationRequest
-    }
+    preHandler: requireAuth()
   }, async (req, reply) => {
     try {
       const body = OrchestrationRequest.parse(req.body);
@@ -451,10 +460,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
 
   // Workflow actions (pause, resume, fail)
   f.post('/workflow/action', { 
-    preHandler: requireAuth(),
-    schema: {
-      body: WorkflowActionRequest
-    }
+    preHandler: requireAuth()
   }, async (req, reply) => {
     try {
       const body = WorkflowActionRequest.parse(req.body);
