@@ -1,5 +1,20 @@
 import { z } from 'zod';
 
+// Values you can interpolate into templates
+export type TemplateScalar = string | number | boolean;
+
+// Context available to the template engine.
+// We give it an index signature so keyed access is type-safe.
+export interface TemplateVars {
+  currentDate: string;
+  [key: string]: TemplateScalar;
+}
+
+// Generic prompt arguments from callers (validated by Zod)
+export const PromptArgsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
+
+export type PromptArgs = z.infer<typeof PromptArgsSchema>;
+
 /**
  * Schema for prompt argument definitions
  */

@@ -1,22 +1,33 @@
-import { PromptTemplate } from './types.js';
+import { PromptTemplate, TemplateVars, PromptArgs, PromptArgsSchema } from './types.js';
 import { ICN_PROMPTS, getPromptByName } from './templates.js';
+
+/**
+ * Build typed template context from user arguments
+ */
+function buildContext(args: unknown): TemplateVars {
+  // Validate and parse arguments
+  const validatedArgs = PromptArgsSchema.safeParse(args);
+  const safeArgs = validatedArgs.success ? validatedArgs.data : {};
+  
+  return {
+    currentDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+    ...safeArgs,
+  };
+}
 
 /**
  * Simple template interpolation using handlebars-like syntax
  * Supports {{variable}} and {{#if variable}}content{{/if}} patterns
  */
-export function interpolateTemplate(template: string, variables: Record<string, any>): string {
+export function interpolateTemplate(template: string, variables: unknown): string {
   let result = template;
   
-  // Add built-in variables
-  const allVariables = {
-    ...variables,
-    currentDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
-  };
+  // Build typed context
+  const ctx = buildContext(variables);
   
   // Handle conditional blocks with else first: {{#if variable}}content{{else}}alternative{{/if}}
-  result = result.replace(/{{#if\s+(\w+)}}([\s\S]*?){{else}}([\s\S]*?){{\/if}}/g, (match, varName, ifContent, elseContent) => {
-    const value = allVariables[varName];
+  result = result.replace(/{{#if\s+(\w+)}}([\s\S]*?){{else}}([\s\S]*?){{\/if}}/g, (match, varName: string, ifContent, elseContent) => {
+    const value = ctx[varName];
     if (value && value !== '' && value !== null && value !== undefined) {
       return ifContent;
     }
@@ -24,8 +35,8 @@ export function interpolateTemplate(template: string, variables: Record<string, 
   });
   
   // Handle conditional blocks without else: {{#if variable}}content{{/if}}
-  result = result.replace(/{{#if\s+(\w+)}}([\s\S]*?){{\/if}}/g, (match, varName, content) => {
-    const value = allVariables[varName];
+  result = result.replace(/{{#if\s+(\w+)}}([\s\S]*?){{\/if}}/g, (match, varName: string, content) => {
+    const value = ctx[varName];
     if (value && value !== '' && value !== null && value !== undefined) {
       return content;
     }
@@ -33,8 +44,8 @@ export function interpolateTemplate(template: string, variables: Record<string, 
   });
   
   // Handle simple variable substitution: {{variable}}
-  result = result.replace(/{{(\w+)}}/g, (match, varName) => {
-    const value = allVariables[varName];
+  result = result.replace(/{{(\w+)}}/g, (match, varName: string) => {
+    const value = ctx[varName];
     return value !== undefined ? String(value) : match;
   });
   
@@ -46,7 +57,7 @@ export function interpolateTemplate(template: string, variables: Record<string, 
  */
 export function validatePromptArguments(
   promptName: string, 
-  providedArgs: Record<string, any>
+  providedArgs: PromptArgs
 ): { valid: boolean; errors: string[] } {
   const prompt = getPromptByName(promptName);
   if (!prompt) {
@@ -70,7 +81,7 @@ export function validatePromptArguments(
  */
 export function generatePrompt(
   promptName: string,
-  args: Record<string, any> = {}
+  args: PromptArgs = {}
 ): { success: boolean; content?: string; errors?: string[] } {
   const validation = validatePromptArguments(promptName, args);
   if (!validation.valid) {
