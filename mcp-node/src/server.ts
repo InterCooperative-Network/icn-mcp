@@ -767,7 +767,7 @@ class ICNMCPServer {
             });
           }
         }
-      } catch (error) {
+      } catch {
         // Directory might not exist, continue
       }
 
@@ -785,7 +785,7 @@ class ICNMCPServer {
             });
           }
         }
-      } catch (error) {
+      } catch {
         // Directory might not exist, continue
       }
 
@@ -799,7 +799,7 @@ class ICNMCPServer {
           description: 'ICN policy rules configuration for access control and code review requirements',
           mimeType: 'application/json'
         });
-      } catch (error) {
+      } catch {
         // File might not exist, continue
       }
 
@@ -813,7 +813,7 @@ class ICNMCPServer {
           description: 'GitHub CODEOWNERS file specifying code ownership and review requirements',
           mimeType: 'text/plain'
         });
-      } catch (error) {
+      } catch {
         // File might not exist, continue
       }
 
@@ -917,7 +917,7 @@ class ICNMCPServer {
             // Continue searching if neither exists
           }
         }
-      } catch (error) {
+      } catch {
         // Continue searching
       }
       current = path.dirname(current);
