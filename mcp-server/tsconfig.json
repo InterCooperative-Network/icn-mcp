@@ -3,7 +3,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@mcp-node/*": ["../mcp-node/src/*"]
     }
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]

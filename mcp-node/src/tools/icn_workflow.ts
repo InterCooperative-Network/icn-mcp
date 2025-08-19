@@ -26,14 +26,19 @@ const TOOL_WEIGHT: Record<string, number> = {
   'icn_suggest_approach': 2
 };
 
+export interface AuthContext {
+  actor: string | null;
+  bearer: string | null;
+  roles: string[];
+  scopes: string[];
+  tenantId: string | null;
+}
+
 export interface StartWorkflowParams {
   templateId: string;
   initialData?: Record<string, any>;
   sourceRequestId?: string;
-  authContext?: {
-    agentName: string;
-    agentKind: string;
-  };
+  authContext?: AuthContext;
 }
 
 export interface StartWorkflowResponse {
@@ -45,6 +50,7 @@ export interface StartWorkflowResponse {
 
 export interface GetNextStepParams {
   workflowId: string;
+  authContext?: AuthContext;
 }
 
 export interface GetNextStepResponse {
@@ -60,16 +66,18 @@ export interface CreateCheckpointParams {
   notes?: string;
   completeStep?: boolean;
   sourceRequestId?: string;
-  authContext?: {
-    agentName: string;
-    agentKind: string;
-  };
+  idempotencyKey?: string;
+  authContext?: AuthContext;
 }
 
 export interface CreateCheckpointResponse {
   checkpoint: WorkflowCheckpoint;
   nextStep: WorkflowNextStep;
   state: WorkflowState;
+}
+
+export interface ListTemplatesParams {
+  authContext?: AuthContext;
 }
 
 export interface ListTemplatesResponse {
@@ -86,11 +94,17 @@ export interface OrchestrationStep {
   dependsOn?: string[];
 }
 
+export interface GetWorkflowStateParams {
+  workflowId: string;
+  authContext?: AuthContext;
+}
+
 export interface OrchestrationParams {
   intent: string;
   context?: string;
   constraints?: string[];
   actor?: string;
+  authContext?: AuthContext;
   _testSeed?: string; // For deterministic IDs in tests
 }
 
@@ -115,13 +129,12 @@ export interface OrchestrationResponse {
  * Start a new workflow from a template
  */
 export async function icnStartWorkflow(
-  params: StartWorkflowParams,
-  createdBy?: string
+  params: StartWorkflowParams
 ): Promise<StartWorkflowResponse> {
   const { templateId, initialData = {}, sourceRequestId, authContext } = params;
 
-  // Use authContext if provided, fallback to createdBy parameter
-  const actualCreatedBy = authContext?.agentName || createdBy || 'unknown';
+  // Use authContext if provided
+  const actualCreatedBy = authContext?.actor || 'unknown';
 
   // Get template to validate it exists
   const template = workflowEngine.getTemplate(templateId);
@@ -162,7 +175,11 @@ export async function icnStartWorkflow(
  * Get the next step in a workflow
  */
 export async function icnGetNextStep(params: GetNextStepParams): Promise<GetNextStepResponse> {
-  const { workflowId } = params;
+  const { workflowId, authContext } = params;
+  
+  // TODO: Use authContext for authorization checks
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _authContext = authContext;
 
   const state = workflowEngine.getWorkflowState(workflowId);
   if (!state) {
@@ -200,7 +217,11 @@ export async function icnGetNextStep(params: GetNextStepParams): Promise<GetNext
  * Create a checkpoint and optionally complete the current step
  */
 export async function icnCheckpoint(params: CreateCheckpointParams): Promise<CreateCheckpointResponse> {
-  const { workflowId, stepId, data, notes, completeStep = false, sourceRequestId, authContext } = params;
+  const { workflowId, stepId, data, notes, completeStep = false, sourceRequestId, idempotencyKey, authContext } = params;
+
+  // TODO: Implement idempotency using idempotencyKey
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _idempotencyKey = idempotencyKey;
 
   const state = workflowEngine.getWorkflowState(workflowId);
   if (!state) {
@@ -208,7 +229,7 @@ export async function icnCheckpoint(params: CreateCheckpointParams): Promise<Cre
   }
 
   // Basic authorization check if authContext is provided
-  if (authContext && state.createdBy !== authContext.agentName && authContext.agentKind !== 'admin') {
+  if (authContext && state.createdBy !== authContext.actor && !authContext.roles.includes('admin')) {
     throw new Error('Access denied: insufficient permissions to modify this workflow');
   }
 
@@ -244,7 +265,12 @@ export async function icnCheckpoint(params: CreateCheckpointParams): Promise<Cre
 /**
  * List available workflow templates
  */
-export async function icnListWorkflowTemplates(): Promise<ListTemplatesResponse> {
+export async function icnListWorkflowTemplates(params?: ListTemplatesParams): Promise<ListTemplatesResponse> {
+  const { authContext } = params || {};
+  
+  // TODO: Use authContext for filtering templates by tenant/access
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _authContext = authContext;
   const templates = workflowEngine.getAvailableTemplates();
   
   // Extract unique categories and tags
@@ -261,8 +287,12 @@ export async function icnListWorkflowTemplates(): Promise<ListTemplatesResponse>
 /**
  * Get workflow state and history
  */
-export async function icnGetWorkflowState(params: { workflowId: string }): Promise<WorkflowState> {
-  const { workflowId } = params;
+export async function icnGetWorkflowState(params: GetWorkflowStateParams): Promise<WorkflowState> {
+  const { workflowId, authContext } = params;
+  
+  // TODO: Use authContext for tenant isolation and access checks
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _authContext = authContext;
   
   const state = workflowEngine.getWorkflowState(workflowId);
   if (!state) {
@@ -276,7 +306,11 @@ export async function icnGetWorkflowState(params: { workflowId: string }): Promi
  * Orchestrate multiple MCP tools to produce actionable plans from intents
  */
 export async function icnWorkflow(params: OrchestrationParams): Promise<OrchestrationResponse> {
-  const { intent, context, constraints = [], actor, _testSeed } = params;
+  const { intent, context, constraints = [], actor, authContext, _testSeed } = params;
+  
+  // TODO: Use authContext for tool authorization and tenant isolation  
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _authContext = authContext;
   
   // Generate unique ID for this orchestration (deterministic for tests)
   const orchestrationId = _testSeed ? `orch_${_testSeed}` : `orch_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
