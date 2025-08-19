@@ -146,27 +146,31 @@ function buildLintCommand(request: RunLintersRequest): string[] {
   
   switch (request.linterType) {
     case 'eslint':
-      const eslintCmd = ['npm', 'run', 'lint'];
-      if (request.fix) eslintCmd.push('--', '--fix');
-      if (request.files?.length) {
-        eslintCmd.push('--');
-        eslintCmd.push(...request.files);
+      {
+        const eslintCmd = ['npm', 'run', 'lint'];
+        if (request.fix) eslintCmd.push('--', '--fix');
+        if (request.files?.length) {
+          eslintCmd.push('--');
+          eslintCmd.push(...request.files);
+        }
+        return eslintCmd;
       }
-      return eslintCmd;
       
     case 'prettier':
-      const prettierCmd = ['npx', 'prettier'];
-      if (request.fix) {
-        prettierCmd.push('--write');
-      } else {
-        prettierCmd.push('--check');
+      {
+        const prettierCmd = ['npx', 'prettier'];
+        if (request.fix) {
+          prettierCmd.push('--write');
+        } else {
+          prettierCmd.push('--check');
+        }
+        if (request.files?.length) {
+          prettierCmd.push(...request.files);
+        } else {
+          prettierCmd.push('**/*.{ts,js,json,md}');
+        }
+        return prettierCmd;
       }
-      if (request.files?.length) {
-        prettierCmd.push(...request.files);
-      } else {
-        prettierCmd.push('**/*.{ts,js,json,md}');
-      }
-      return prettierCmd;
       
     case 'tsc':
       if (request.workspace) {

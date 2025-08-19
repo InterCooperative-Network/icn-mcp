@@ -25,6 +25,11 @@ export interface FileSearchResponse {
 }
 
 function getRepoRoot(): string {
+  // Use the environment variable first, then fall back to automatic detection
+  if (process.env.REPO_ROOT) {
+    return process.env.REPO_ROOT;
+  }
+  
   // Walk up to find the repo root (package.json at monorepo root)
   let cur = process.cwd();
   for (let i = 0; i < 5; i++) {
@@ -82,7 +87,7 @@ export async function icnSearchFiles(request: FileSearchRequest): Promise<FileSe
           modified: stats.mtime.toISOString(),
           isDirectory: stats.isDirectory()
         });
-      } catch (err) {
+      } catch {
         // Skip files that can't be stat'd (permissions, etc.)
         continue;
       }

@@ -24,7 +24,7 @@ export interface ExplainTestFailuresResponse {
   priorityOrder: number[]; // Indices into analyses array, ordered by priority
 }
 
-function categorizeFailure(error: string, testName: string): {
+function categorizeFailure(error: string, _testName: string): {
   category: TestFailureAnalysis['category'];
   severity: TestFailureAnalysis['severity'];
 } {
@@ -45,12 +45,22 @@ function categorizeFailure(error: string, testName: string): {
     return { category: 'timeout', severity: 'medium' };
   }
   
-  // Assertion errors
-  if (errorLower.includes('expected') && errorLower.includes('received') ||
+  // Assertion errors - improved patterns
+  if ((errorLower.includes('expected') && (errorLower.includes('received') || errorLower.includes('to equal'))) ||
       errorLower.includes('assert') ||
       errorLower.includes('toequal') ||
-      errorLower.includes('tobe')) {
+      errorLower.includes('tobe') ||
+      errorLower.includes('assertion')) {
     return { category: 'assertion', severity: 'medium' };
+  }
+  
+  // Logic errors (null reference, undefined, etc.)
+  if (errorLower.includes('cannot read prop') ||
+      errorLower.includes('cannot read property') ||
+      errorLower.includes('undefined') ||
+      errorLower.includes('null') ||
+      errorLower.includes('is not a function')) {
+    return { category: 'logic', severity: 'high' };
   }
   
   // Dependency/environment errors
@@ -59,14 +69,6 @@ function categorizeFailure(error: string, testName: string): {
       errorLower.includes('network') ||
       errorLower.includes('connection')) {
     return { category: 'environment', severity: 'high' };
-  }
-  
-  // Logic errors (null reference, undefined, etc.)
-  if (errorLower.includes('cannot read prop') ||
-      errorLower.includes('undefined') ||
-      errorLower.includes('null') ||
-      errorLower.includes('is not a function')) {
-    return { category: 'logic', severity: 'high' };
   }
   
   return { category: 'unknown', severity: 'medium' };
@@ -125,52 +127,52 @@ function parseTestOutput(output: string, testType: string): TestFailureAnalysis[
   const analyses: TestFailureAnalysis[] = [];
   
   if (testType === 'vitest' || testType === 'jest' || testType === 'npm') {
-    // Parse vitest/jest output
-    const failureBlocks = output.split(/❌|FAIL|✗/).slice(1);
+    // Parse vitest/jest output  
+    const lines = output.split('\n');
+    let currentTest = '';
+    let currentError = '';
+    let inFailureBlock = false;
     
-    for (const block of failureBlocks) {
-      const lines = block.trim().split('\n');
-      if (lines.length === 0) continue;
-      
-      // Extract test name
-      const testNameMatch = lines[0].match(/(.+?)\s+>/);
-      const testName = testNameMatch ? testNameMatch[1].trim() : lines[0].trim();
-      
-      // Extract error message
-      let error = '';
-      let file = '';
-      let line = 0;
-      
-      for (const lineText of lines) {
-        if (lineText.includes('Error:') || lineText.includes('AssertionError:')) {
-          error = lineText.trim();
+    for (const line of lines) {
+      if (line.includes('❌') || line.includes('FAIL') || line.includes('✗')) {
+        // Save previous test if exists
+        if (currentTest && currentError) {
+          const { category, severity } = categorizeFailure(currentError, currentTest);
+          analyses.push({
+            testName: currentTest,
+            error: currentError.trim(),
+            category,
+            severity,
+            suggestions: generateSuggestions({ testName: currentTest, error: currentError, category, severity, suggestions: [] })
+          });
         }
         
-        // Extract file and line info
-        const fileMatch = lineText.match(/at .+?\((.+?):(\d+):\d+\)/);
-        if (fileMatch && !file) {
-          file = fileMatch[1];
-          line = parseInt(fileMatch[2], 10);
+        // Start new test
+        currentTest = line.replace(/❌|FAIL|✗/, '').trim();
+        currentError = '';
+        inFailureBlock = true;
+      } else if (inFailureBlock && line.trim()) {
+        // Look for error patterns
+        if (line.includes('Error:') || line.includes('AssertionError:') || 
+            line.includes('expected') || line.includes('received')) {
+          currentError += line.trim() + ' ';
         }
+      } else if (line.trim() === '' && inFailureBlock) {
+        // End of current failure block
+        inFailureBlock = false;
       }
-      
-      if (!error) {
-        error = lines.find(l => l.trim().length > 0)?.trim() || 'Unknown error';
-      }
-      
-      const { category, severity } = categorizeFailure(error, testName);
-      const analysis: TestFailureAnalysis = {
-        testName,
-        error,
-        file,
-        line: line || undefined,
+    }
+    
+    // Add the last test if exists
+    if (currentTest && currentError) {
+      const { category, severity } = categorizeFailure(currentError, currentTest);
+      analyses.push({
+        testName: currentTest,
+        error: currentError.trim(),
         category,
         severity,
-        suggestions: []
-      };
-      
-      analysis.suggestions = generateSuggestions(analysis);
-      analyses.push(analysis);
+        suggestions: generateSuggestions({ testName: currentTest, error: currentError, category, severity, suggestions: [] })
+      });
     }
   } else if (testType === 'cargo') {
     // Parse Cargo test output
