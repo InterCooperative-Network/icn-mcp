@@ -6,13 +6,39 @@ import { glob } from 'glob';
 
 /**
  * Strip comments from JSON-like content to validate structure
+ * More careful approach to avoid removing content inside strings
  */
 function stripJsonComments(content) {
-  // Remove single-line comments
-  content = content.replace(/\/\/.*$/gm, '');
-  // Remove multi-line comments
-  content = content.replace(/\/\*[\s\S]*?\*\//g, '');
-  return content;
+  // This is a simple approach that handles basic TypeScript config files
+  // For more complex cases, we'd need a proper JSON-with-comments parser
+  
+  // Remove single-line comments that are not inside strings
+  const lines = content.split('\n');
+  const processedLines = lines.map(line => {
+    // Find // that's not inside a string
+    let inString = false;
+    let escape = false;
+    for (let i = 0; i < line.length - 1; i++) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (line[i] === '\\') {
+        escape = true;
+        continue;
+      }
+      if (line[i] === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString && line[i] === '/' && line[i + 1] === '/') {
+        return line.substring(0, i);
+      }
+    }
+    return line;
+  });
+  
+  return processedLines.join('\n');
 }
 
 /**
