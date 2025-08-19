@@ -9,6 +9,9 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
+  ToolListChangedNotification,
+  ResourceListChangedNotification,
+  PromptListChangedNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import fs from 'node:fs/promises';
 import { accessSync } from 'node:fs';
@@ -65,9 +68,16 @@ class ICNMCPServer {
       },
       {
         capabilities: {
-          tools: {},
-          resources: {},
-          prompts: {},
+          tools: {
+            listChanged: true,
+          },
+          resources: {
+            listChanged: true,
+            subscribe: false,
+          },
+          prompts: {
+            listChanged: true,
+          },
         },
       }
     );
@@ -1222,6 +1232,54 @@ class ICNMCPServer {
       console.error('[MCP] Unhandled rejection at:', promise, 'reason:', reason);
       process.exit(1);
     });
+  }
+
+  /**
+   * Send a notification that the list of available tools has changed.
+   * This should be called whenever tools are added, removed, or modified.
+   */
+  private async notifyToolsChanged(): Promise<void> {
+    try {
+      const notification: ToolListChangedNotification = {
+        method: 'notifications/tools/list_changed',
+        params: {},
+      };
+      await this.server.notification(notification);
+    } catch (error) {
+      console.error('[MCP] Failed to send tools list changed notification:', error);
+    }
+  }
+
+  /**
+   * Send a notification that the list of available resources has changed.
+   * This should be called whenever resources are added, removed, or modified.
+   */
+  private async notifyResourcesChanged(): Promise<void> {
+    try {
+      const notification: ResourceListChangedNotification = {
+        method: 'notifications/resources/list_changed',
+        params: {},
+      };
+      await this.server.notification(notification);
+    } catch (error) {
+      console.error('[MCP] Failed to send resources list changed notification:', error);
+    }
+  }
+
+  /**
+   * Send a notification that the list of available prompts has changed.
+   * This should be called whenever prompts are added, removed, or modified.
+   */
+  private async notifyPromptsChanged(): Promise<void> {
+    try {
+      const notification: PromptListChangedNotification = {
+        method: 'notifications/prompts/list_changed',
+        params: {},
+      };
+      await this.server.notification(notification);
+    } catch (error) {
+      console.error('[MCP] Failed to send prompts list changed notification:', error);
+    }
   }
 
   async run() {
