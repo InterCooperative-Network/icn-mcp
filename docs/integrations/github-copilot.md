@@ -4,13 +4,26 @@ This document describes how to integrate the ICN Model Context Protocol (MCP) se
 
 ## Overview
 
-The ICN MCP server exposes key tools that provide GitHub Copilot with ICN-specific domain knowledge:
+The ICN MCP server exposes key tools and resources that provide GitHub Copilot with ICN-specific domain knowledge:
+
+### Tools
 
 - **icn_get_architecture**: Retrieve ICN architecture and protocol documentation
 - **icn_get_invariants**: List system invariants from the ICN catalog
 - **icn_check_policy**: Validate changes against ICN policies
 - **icn_get_task_context**: Get full task briefings with requirements and constraints
 - **icn_workflow**: Orchestrate multiple tools to produce actionable plans from intents
+
+### Resources
+
+The MCP server also exposes important ICN context through the resources capability:
+
+- **Documentation**: Architecture and invariants docs with URIs like `icn://docs/architecture/overview.md`
+- **Policy Rules**: Access to policy configuration at `icn://policy/rules.json`
+- **CODEOWNERS**: Repository ownership information at `icn://CODEOWNERS`
+- **Logs**: Recent system logs at `icn://logs/recent` (placeholder)
+
+These resources allow GitHub Copilot to directly access and reference ICN documentation, policies, and configuration when providing assistance.
 
 ## Setup
 
@@ -236,6 +249,45 @@ Orchestrates multiple MCP tools to produce actionable plans from high-level inte
 - **File Path Extraction**: Identifies likely modified files from intent descriptions for policy checks
 - **Complexity Assessment**: Categorizes workflows as low/medium/high complexity with time estimates
 - **Context Integration**: Uses task context when available to enhance planning accuracy
+
+## Resources
+
+The ICN MCP server also exposes resources through the MCP resources capability, allowing direct access to important ICN context:
+
+### Available Resources
+
+- **`icn://docs/architecture/`**: ICN architecture documentation files
+  - Example: `icn://docs/architecture/00-overview.md`
+  - Content: Architecture overviews, component designs, system flows
+  - MIME Type: `text/markdown`
+
+- **`icn://docs/invariants/`**: System invariants documentation
+  - Example: `icn://docs/invariants/catalog.md`
+  - Content: System constraints, validation rules, compliance requirements
+  - MIME Type: `text/markdown`
+
+- **`icn://policy/rules.json`**: Policy configuration
+  - Content: Access control rules, path capabilities, review requirements
+  - MIME Type: `application/json`
+
+- **`icn://CODEOWNERS`**: Repository ownership configuration
+  - Content: Code ownership mappings for review assignments
+  - MIME Type: `text/plain`
+
+- **`icn://logs/recent`**: Recent system logs
+  - Content: Debugging information, task execution logs
+  - MIME Type: `text/plain`
+
+### Using Resources
+
+GitHub Copilot can access these resources directly through the MCP resources protocol to:
+
+- **Reference documentation**: Get the latest architecture docs to understand system design
+- **Check policies**: Review access control rules before suggesting changes
+- **Understand ownership**: Reference CODEOWNERS for appropriate reviewers
+- **Debug issues**: Access recent logs for troubleshooting context
+
+The resources provide GitHub Copilot with direct access to the most current ICN documentation and configuration, ensuring suggestions are aligned with project policies and architecture.
 
 ## Usage Examples
 
