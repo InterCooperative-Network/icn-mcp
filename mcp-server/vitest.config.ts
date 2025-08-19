@@ -10,7 +10,8 @@ export default defineConfig({
   },
   resolve: { 
     alias: { 
-      '@': resolve(__dirname, 'src') 
+      '@': resolve(__dirname, 'src'),
+      '@mcp-node/tools/icn_workflow': resolve(__dirname, '../mcp-node/src/tools/icn_workflow')
     } 
   },
 })

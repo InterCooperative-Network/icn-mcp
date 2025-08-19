@@ -20,7 +20,7 @@ import {
   icnWorkflow,
   icnGetWorkflowState,
   type AuthContext
-} from '@mcp-node/tools/icn_workflow.js';
+} from '@mcp-node/tools/icn_workflow';
 
 // Enhanced validation schemas with size limits
 const StartWorkflowRequest = z.object({
