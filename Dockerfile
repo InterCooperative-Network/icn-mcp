@@ -23,7 +23,7 @@ COPY agents/reviewer/package.json agents/reviewer/
 # Install all dependencies (including dev dependencies for build)
 RUN npm ci
 
-# Copy the rest of the source code including pre-built dist
+# Copy the rest of the source code (pre-built)
 COPY . .
 
 # ---- runtime ----
@@ -35,12 +35,14 @@ WORKDIR /app
 # Create non-root user with specific UID/GID
 RUN groupadd -g 10001 nodeapp && useradd -r -u 10001 -g nodeapp nodeapp
 
-# Copy production node_modules from builder (includes workspace dependencies)
-COPY --from=builder /app/node_modules /app/node_modules
+# Copy production node_modules and package files
 COPY --from=builder /app/package.json /app/package-lock.json ./
+# Prefer clean prod deps in the runtime image:
+RUN npm ci --omit=dev
 
-# Copy built artifacts (mcp-server output is in root dist)
+# Copy built artifacts from correct location (root dist, not pre-existing mcp-server/dist)
 COPY --from=builder /app/dist /app/mcp-server/dist
+COPY mcp-server/package.json mcp-server/
 
 # Create data directory for SQLite and set proper permissions
 RUN mkdir -p /data && chown -R nodeapp:nodeapp /data
