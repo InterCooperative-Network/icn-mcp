@@ -1,12 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { glob } from 'glob';
+import { execSync } from 'node:child_process';
 
 export interface FileSearchRequest {
   pattern: string;
   directory?: string;
   includeHidden?: boolean;
   maxResults?: number;
+  baseDir?: string; // optional override for cwd during tests or workspaces
 }
 
 export interface FileSearchResult {
@@ -24,27 +26,27 @@ export interface FileSearchResponse {
   searchDirectory: string;
 }
 
-function getRepoRoot(): string {
-  // Use the environment variable first, then fall back to automatic detection
-  if (process.env.REPO_ROOT) {
-    return process.env.REPO_ROOT;
+function detectRepoRoot(): string {
+  // If the REPO_ROOT environment variable is set, use it as the repository root directory.
+  // This is useful in CI environments, scripts, or when automatic detection may fail.
+  // The value should be an absolute path to the root of the repository.
+  // If not set, the function will attempt to auto-detect the repository root via git.
+  const env = process.env.REPO_ROOT;
+  if (env) return env;
+  try {
+    const out = execSync('git rev-parse --show-toplevel', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString().trim();
+    if (out) return out;
+  } catch {
+    // Git command failed, fallback to process.cwd()
   }
-  
-  // Walk up to find the repo root (package.json at monorepo root)
-  let cur = process.cwd();
-  for (let i = 0; i < 5; i++) {
-    if (fs.existsSync(path.join(cur, "package.json")) && fs.existsSync(path.join(cur, "docs"))) {
-      return cur;
-    }
-    const up = path.dirname(cur);
-    if (up === cur) break;
-    cur = up;
-  }
-  return cur;
+  return process.cwd();
 }
 
 export async function icnSearchFiles(request: FileSearchRequest): Promise<FileSearchResponse> {
-  const repoRoot = getRepoRoot();
+  const repoRoot = request.baseDir
+    ? path.resolve(request.baseDir)
+    : detectRepoRoot();
   const searchDir = request.directory ? path.resolve(repoRoot, request.directory) : repoRoot;
   const maxResults = request.maxResults || 50;
   

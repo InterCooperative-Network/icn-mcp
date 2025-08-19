@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { STDOUT_TRUNCATE_LIMIT, STDERR_TRUNCATE_LIMIT } from './constants.js';
 
 export interface RunLintersRequest {
   linterType?: 'eslint' | 'prettier' | 'tsc' | 'custom';
@@ -224,8 +225,8 @@ export async function icnRunLinters(request: RunLintersRequest): Promise<RunLint
         command: command.join(' '),
         exitCode: exitCode || -1,
         result: lintResult,
-        stdout: stdout.slice(-3000), // Truncate to last 3000 chars
-        stderr: stderr.slice(-1000), // Truncate to last 1000 chars
+        stdout: stdout.slice(-STDOUT_TRUNCATE_LIMIT),
+        stderr: stderr.slice(-STDERR_TRUNCATE_LIMIT),
         duration
       });
     });

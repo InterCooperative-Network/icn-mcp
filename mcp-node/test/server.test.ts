@@ -7,9 +7,25 @@ describe('MCP Server', () => {
       const manifest = generateToolManifest();
       
       expect(Array.isArray(manifest)).toBe(true);
-      expect(manifest.length).toBe(27);
-      
+      // Allow growth as new tools ship; enforce minimum baseline
+      expect(manifest.length).toBeGreaterThanOrEqual(27);
       const toolNames = manifest.map(tool => tool.name);
+      
+      // Ensure core tools exist
+      for (const name of [
+        'icn_search_files',
+        'icn_read_file',
+        'icn_write_patch',
+        'icn_run_tests',
+        'icn_run_linters',
+        'icn_explain_test_failures',
+        'icn_generate_pr_patch'
+      ]) {
+        expect(toolNames).toContain(name);
+      }
+      // invariant: names are unique
+      expect(new Set(toolNames).size).toBe(toolNames.length);
+      
       expect(toolNames).toContain('icn_get_architecture');
       expect(toolNames).toContain('icn_get_invariants');
       expect(toolNames).toContain('icn_check_policy');

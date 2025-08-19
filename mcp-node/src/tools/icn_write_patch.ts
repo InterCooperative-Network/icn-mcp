@@ -89,7 +89,7 @@ export async function icnWritePatch(request: WritePatchRequest): Promise<WritePa
     // Write the file
     fs.writeFileSync(filePath, request.content, 'utf8');
     
-    const linesWritten = request.content.split('\n').length;
+    const linesWritten = request.content ? request.content.split('\n').length : 0;
     
     return {
       success: true,

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { BINARY_FILE_EXTENSIONS } from './constants.js';
 
 export interface FileReadRequest {
   filePath: string;
@@ -47,8 +48,7 @@ function isBinaryFile(filePath: string): boolean {
     
     // Check for common binary file extensions
     const ext = path.extname(filePath).toLowerCase();
-    const binaryExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.zip', '.tar', '.gz', '.bin', '.exe', '.dll', '.so'];
-    return binaryExtensions.includes(ext);
+    return BINARY_FILE_EXTENSIONS.includes(ext);
   } catch {
     return false;
   }

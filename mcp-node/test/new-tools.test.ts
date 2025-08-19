@@ -43,7 +43,8 @@ describe('ICN File Operations Tools', () => {
     it('should search for TypeScript files', async () => {
       const result = await icnSearchFiles({
         pattern: '**/*.ts',
-        directory: 'test-tmp'
+        directory: 'test-tmp',
+        baseDir: process.cwd()
       });
       
       expect(result.results.length).toBeGreaterThan(0);

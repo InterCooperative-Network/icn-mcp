@@ -252,7 +252,11 @@ export async function icnGeneratePRPatch(request: GeneratePRPatchRequest): Promi
     
     // Save artifact
     const artifactPath = generateArtifactPath(request.title);
-    fs.writeFileSync(artifactPath, JSON.stringify(prDescriptor, null, 2), 'utf8');
+    try {
+      fs.writeFileSync(artifactPath, JSON.stringify(prDescriptor, null, 2), 'utf8');
+    } catch (err) {
+      throw new Error(`Failed to create artifact at ${artifactPath}: ${err instanceof Error ? err.message : String(err)}`);
+    }
     
     prDescriptor.artifact = {
       path: path.relative(repoRoot, artifactPath),
