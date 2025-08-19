@@ -22,7 +22,7 @@ export const consentPrompts: ICNPrompt[] = [
     ],
     template: `# Tool Execution Consent Request
 
-{{#if riskLevel}}**Risk Level**: {{#if riskLevel}}🔴{{else}}{{#if riskLevel}}🟡{{else}}🟢{{/if}}{{/if}} {{riskLevel}}{{/if}}
+{{#if riskLevel}}**Risk Level**: {{#eq riskLevel "high"}}🔴{{else}}{{#eq riskLevel "medium"}}🟡{{else}}🟢{{/eq}}{{/eq}} {{riskLevel}}{{/if}}
 
 ## Tool Information
 - **Name**: {{toolName}}

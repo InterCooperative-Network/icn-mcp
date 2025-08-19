@@ -48,7 +48,7 @@ export async function icnRequestConsent(args: RequestConsentArgs): Promise<Reque
   }
   
   // Generate unique request ID
-  const requestId = `consent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const requestId = `consent_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   return {
     request,

@@ -78,6 +78,114 @@ The MCP server supports configuration via environment variables:
 
 **Example .env configuration:**
 ```bash
+REPO_ROOT=/path/to/icn-mcp
+DOCS_ROOT=/path/to/icn-mcp/docs
+MCP_DB_DIR=/path/to/icn-mcp/var
+POLICY_RULES_PATH=/path/to/icn-mcp/mcp-server/policy.rules.json
+
+# Consent system configuration
+ICN_CONSENT_REQUIRE_ALL=false
+ICN_CONSENT_TIMEOUT=300
+ICN_CONSENT_ALWAYS_REQUIRE="icn_write_patch,icn_run_tests"
+ICN_CONSENT_LOG=true
+```
+
+## User Interface Features
+
+### Tool Discovery
+
+Use `icn_display_tools` to discover available tools:
+
+```typescript
+// Display all tools
+const tools = await icn_display_tools();
+
+// Display tools by category
+const devTools = await icn_display_tools({ category: "development" });
+```
+
+**Response format:**
+```json
+{
+  "tools": [
+    {
+      "name": "icn_write_patch",
+      "description": "Write or patch a file with policy enforcement",
+      "category": "development",
+      "riskLevel": "high",
+      "requiresConsent": true,
+      "example": "icn_write_patch({ files: [\"src/example.ts\"], content: \"...\" })"
+    }
+  ],
+  "totalCount": 26,
+  "categories": ["architecture", "development", "governance"]
+}
+```
+
+### Consent Requests
+
+Use `icn_request_consent` for transparent user approval:
+
+```typescript
+const consent = await icn_request_consent({
+  toolName: "icn_write_patch",
+  context: "Adding new MCP tool implementation"
+});
+```
+
+**GitHub Copilot Integration:**
+- Consent prompts display as formatted chat messages
+- Risk levels shown with color-coded emojis (🟢🟡🔴)
+- Timeout warnings clearly communicated
+- User can respond with "yes", "no", or additional instructions
+
+### Progress Reporting
+
+Use `icn_report_progress` for real-time execution updates:
+
+```typescript
+await icn_report_progress({
+  toolName: "icn_run_tests",
+  phase: "unit-tests",
+  progress: 75,
+  message: "Running integration tests",
+  status: "info"
+});
+```
+
+**Client Rendering Guidelines:**
+
+**Text-Only Rendering:**
+```
+## Progress Update ℹ️
+
+**Tool:** icn_run_tests
+**Phase:** unit-tests
+**Progress:** [███████░░░] 75%
+**Status:** Running integration tests
+**Time:** 2025-01-15T10:30:00.000Z
+```
+
+**Rich UI Rendering (if supported):**
+- Progress bars: Use actual progress bar components when available
+- Status icons: Render emoji status indicators (✅⚠️❌ℹ️)
+- Expandable details: Make additional details collapsible
+- Real-time updates: Update progress in-place when possible
+
+**Error Handling:**
+```typescript
+await icn_report_progress({
+  toolName: "icn_run_tests",
+  progress: 45,
+  message: "Test failure detected",
+  status: "error",
+  error: {
+    code: "TEST_FAILURE",
+    message: "Integration tests failed in auth module",
+    recoverable: true
+  }
+});
+```
 # Override paths for development
 DOCS_ROOT=/custom/docs/path
 MCP_DB_DIR=/tmp/icn-mcp-dev

@@ -45,6 +45,14 @@ export interface ProgressUpdate {
   message: string;
   /** Timestamp of update */
   timestamp: string;
+  /** Status type: success, warning, error, info */
+  status?: 'success' | 'warning' | 'error' | 'info';
+  /** Error information for failures */
+  error?: {
+    code?: string;
+    message: string;
+    recoverable?: boolean;
+  };
 }
 
 export interface ConsentConfiguration {

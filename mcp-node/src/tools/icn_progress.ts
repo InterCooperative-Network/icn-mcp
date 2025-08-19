@@ -16,6 +16,14 @@ export interface ProgressArgs {
   message: string;
   /** Additional details */
   details?: any;
+  /** Status type: success, warning, error, info */
+  status?: 'success' | 'warning' | 'error' | 'info';
+  /** Error information for failures */
+  error?: {
+    code?: string;
+    message: string;
+    recoverable?: boolean;
+  };
 }
 
 export interface ProgressResponse {
@@ -48,7 +56,9 @@ export async function icnReportProgress(args: ProgressArgs): Promise<ProgressRes
     args.toolName,
     args.phase || 'executing',
     Math.min(100, Math.max(0, args.progress)),
-    args.message || 'In progress...'
+    args.message || 'In progress...',
+    args.status,
+    args.error
   );
   
   // Format progress message
@@ -56,21 +66,44 @@ export async function icnReportProgress(args: ProgressArgs): Promise<ProgressRes
   const progressBar = '█'.repeat(Math.floor(clampedProgress / 10)) + 
                      '░'.repeat(10 - Math.floor(clampedProgress / 10));
   
-  let formatted = `## Progress Update\n\n`;
+  // Status emoji based on status type
+  const statusEmoji = {
+    success: '✅',
+    warning: '⚠️',
+    error: '❌',
+    info: 'ℹ️'
+  }[args.status || 'info'];
+
+  let formatted = `## Progress Update ${statusEmoji}\n\n`;
   formatted += `**Tool:** ${args.toolName}\n`;
   formatted += `**Phase:** ${args.phase || 'executing'}\n`;
   formatted += `**Progress:** [${progressBar}] ${clampedProgress}%\n`;
   formatted += `**Status:** ${args.message}\n`;
   formatted += `**Time:** ${update.timestamp}\n`;
   
+  // Add error information if present
+  if (args.error) {
+    formatted += `\n**Error Details:**\n`;
+    formatted += `- **Code:** ${args.error.code || 'UNKNOWN'}\n`;
+    formatted += `- **Message:** ${args.error.message}\n`;
+    formatted += `- **Recoverable:** ${args.error.recoverable ? 'Yes' : 'No'}\n`;
+  }
+
   if (args.details) {
-    formatted += `**Details:** ${JSON.stringify(args.details, null, 2)}\n`;
+    formatted += `\n**Additional Details:**\n`;
+    formatted += `\`\`\`json\n${JSON.stringify(args.details, null, 2)}\n\`\`\`\n`;
   }
   
   const isComplete = args.progress >= 100;
+  const hasFailed = args.status === 'error' || args.error;
   
-  if (isComplete) {
+  if (isComplete && !hasFailed) {
     formatted += `\n✅ **Execution Complete**`;
+  } else if (hasFailed) {
+    formatted += `\n❌ **Execution ${isComplete ? 'Failed' : 'Encountered Error'}**`;
+    if (args.error?.recoverable) {
+      formatted += ` (Recovery possible)`;
+    }
   }
   
   // Log progress

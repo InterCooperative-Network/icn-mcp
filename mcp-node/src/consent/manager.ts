@@ -11,6 +11,9 @@ export class ConsentManager {
   private consentLog: Array<ConsentRequest & ConsentResponse> = [];
 
   constructor(config?: Partial<ConsentConfiguration>) {
+    // Load configuration from environment variables if available
+    const envConfig = this.loadEnvironmentConfig();
+    
     this.config = {
       requireConsentForAll: false,
       alwaysRequireConsent: [
@@ -27,6 +30,7 @@ export class ConsentManager {
       ],
       consentTimeoutSeconds: 300, // 5 minutes
       logConsentDecisions: true,
+      ...envConfig,
       ...config
     };
   }
@@ -97,7 +101,8 @@ export class ConsentManager {
     }
     
     prompt += `\n**Do you want to proceed with this action?**\n`;
-    prompt += `Type 'yes' to approve, 'no' to deny, or provide additional instructions.`;
+    prompt += `Type 'yes' to approve, 'no' to deny, or provide additional instructions.\n`;
+    prompt += `\n*Note: If no response is provided within ${Math.floor(this.config.consentTimeoutSeconds / 60)} minutes, the request will be automatically denied for security.*`;
     
     return prompt;
   }
@@ -132,13 +137,22 @@ export class ConsentManager {
   /**
    * Create a progress update
    */
-  createProgressUpdate(toolName: string, phase: string, progress: number, message: string): ProgressUpdate {
+  createProgressUpdate(
+    toolName: string, 
+    phase: string, 
+    progress: number, 
+    message: string,
+    status?: 'success' | 'warning' | 'error' | 'info',
+    error?: { code?: string; message: string; recoverable?: boolean }
+  ): ProgressUpdate {
     return {
       toolName,
       phase,
       progress,
       message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      status,
+      error
     };
   }
 
@@ -158,6 +172,49 @@ export class ConsentManager {
 
   // Private helper methods
 
+  /**
+   * Load configuration from environment variables
+   */
+  private loadEnvironmentConfig(): Partial<ConsentConfiguration> {
+    const envConfig: Partial<ConsentConfiguration> = {};
+    
+    // ICN_CONSENT_REQUIRE_ALL: Require consent for all tools
+    if (process.env.ICN_CONSENT_REQUIRE_ALL === 'true') {
+      envConfig.requireConsentForAll = true;
+    }
+    
+    // ICN_CONSENT_TIMEOUT: Consent timeout in seconds
+    if (process.env.ICN_CONSENT_TIMEOUT) {
+      const timeout = parseInt(process.env.ICN_CONSENT_TIMEOUT, 10);
+      if (!isNaN(timeout) && timeout > 0) {
+        envConfig.consentTimeoutSeconds = timeout;
+      }
+    }
+    
+    // ICN_CONSENT_ALWAYS_REQUIRE: Comma-separated list of tools that always require consent
+    if (process.env.ICN_CONSENT_ALWAYS_REQUIRE) {
+      envConfig.alwaysRequireConsent = process.env.ICN_CONSENT_ALWAYS_REQUIRE
+        .split(',')
+        .map(tool => tool.trim())
+        .filter(tool => tool.length > 0);
+    }
+    
+    // ICN_CONSENT_NEVER_REQUIRE: Comma-separated list of tools that never require consent
+    if (process.env.ICN_CONSENT_NEVER_REQUIRE) {
+      envConfig.neverRequireConsent = process.env.ICN_CONSENT_NEVER_REQUIRE
+        .split(',')
+        .map(tool => tool.trim())
+        .filter(tool => tool.length > 0);
+    }
+    
+    // ICN_CONSENT_LOG: Whether to log consent decisions
+    if (process.env.ICN_CONSENT_LOG === 'false') {
+      envConfig.logConsentDecisions = false;
+    }
+    
+    return envConfig;
+  }
+
   private getToolInfo(toolName: string) {
     const manifest = generateToolManifest();
     return manifest.find(t => t.name === toolName) || { 
@@ -167,15 +224,23 @@ export class ConsentManager {
   }
 
   private assessRiskLevel(toolName: string, _args: any): 'low' | 'medium' | 'high' {
+    // Risk Level Definitions:
+    // Low Risk: Read-only operations, no mutations, no external dependencies
+    // Medium Risk: Evaluations, validations, simulations (no persistent writes)
+    // High Risk: File I/O, network calls, persistent state changes
+    
     // High risk tools that modify files or run commands
     if (toolName.includes('write') || toolName.includes('patch') || 
-        toolName.includes('run') || toolName.includes('generate_pr')) {
+        toolName.includes('run') || toolName.includes('generate_pr') ||
+        toolName.includes('create') || toolName.includes('delete') ||
+        toolName.includes('modify') || toolName.includes('upload')) {
       return 'high';
     }
     
-    // Medium risk tools that check policies or modify state
+    // Medium risk tools that check policies, validate, or simulate
     if (toolName.includes('check') || toolName.includes('workflow') ||
-        toolName.includes('orchestrate')) {
+        toolName.includes('orchestrate') || toolName.includes('validate') ||
+        toolName.includes('simulate') || toolName.includes('analyze')) {
       return 'medium';
     }
     
@@ -240,7 +305,13 @@ export class ConsentManager {
     const examples: Record<string, string> = {
       'icn_get_architecture': 'icn_get_architecture({ task: "implementing new agent capabilities" })',
       'icn_check_policy': 'icn_check_policy({ changeset: ["src/new-file.ts"], actor: "architect" })',
-      'icn_workflow': 'icn_workflow({ intent: "Add new MCP tool for file analysis" })'
+      'icn_workflow': 'icn_workflow({ intent: "Add new MCP tool for file analysis" })',
+      'icn_write_patch': 'icn_write_patch({ files: ["src/example.ts"], content: "export class Example {}" })',
+      'icn_run_tests': 'icn_run_tests({ testSuite: "unit", files: ["src/**/*.test.ts"] })',
+      'icn_run_linters': 'icn_run_linters({ files: ["src/**/*.ts"], fix: true })',
+      'icn_display_tools': 'icn_display_tools({ category: "development" })',
+      'icn_request_consent': 'icn_request_consent({ toolName: "icn_write_patch", context: "Adding new feature" })',
+      'icn_report_progress': 'icn_report_progress({ toolName: "icn_run_tests", progress: 50, message: "Running unit tests" })'
     };
     
     return examples[toolName];
