@@ -1,0 +1,256 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { icnCheckPolicy, PolicyCheckRequest } from './icn_check_policy.js';
+
+export interface GeneratePRPatchRequest {
+  title: string;
+  description: string;
+  changedFiles?: string[];
+  baseBranch?: string;
+  targetBranch?: string;
+  actor?: string;
+  createGitHubPR?: boolean;
+}
+
+export interface PRPatchFile {
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  additions: number;
+  deletions: number;
+  diff: string;
+}
+
+export interface PRPatchDescriptor {
+  title: string;
+  description: string;
+  files: PRPatchFile[];
+  baseBranch: string;
+  targetBranch: string;
+  totalAdditions: number;
+  totalDeletions: number;
+  policyCheck: {
+    allowed: boolean;
+    reasons: string[];
+    suggestions: string[];
+  };
+  artifact?: {
+    path: string;
+    created: string;
+  };
+}
+
+export interface GeneratePRPatchResponse {
+  success: boolean;
+  prDescriptor: PRPatchDescriptor;
+  githubPR?: {
+    created: boolean;
+    url?: string;
+    number?: number;
+    error?: string;
+  };
+}
+
+function getRepoRoot(): string {
+  // Walk up to find the repo root (package.json at monorepo root)
+  let cur = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(cur, "package.json")) && fs.existsSync(path.join(cur, "docs"))) {
+      return cur;
+    }
+    const up = path.dirname(cur);
+    if (up === cur) break;
+    cur = up;
+  }
+  return cur;
+}
+
+async function getGitDiff(baseBranch: string, targetBranch: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', ['diff', '--no-color', `${baseBranch}..${targetBranch}`], {
+      cwd: getRepoRoot(),
+      stdio: 'pipe'
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    child.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    child.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    child.on('close', (exitCode) => {
+      if (exitCode === 0) {
+        resolve(stdout);
+      } else {
+        reject(new Error(`Git diff failed: ${stderr}`));
+      }
+    });
+    
+    child.on('error', reject);
+  });
+}
+
+async function getChangedFiles(baseBranch: string, targetBranch: string): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', ['diff', '--name-only', `${baseBranch}..${targetBranch}`], {
+      cwd: getRepoRoot(),
+      stdio: 'pipe'
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    child.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    child.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    child.on('close', (exitCode) => {
+      if (exitCode === 0) {
+        resolve(stdout.trim().split('\n').filter(f => f.length > 0));
+      } else {
+        reject(new Error(`Git diff --name-only failed: ${stderr}`));
+      }
+    });
+    
+    child.on('error', reject);
+  });
+}
+
+function parseDiffOutput(diff: string): PRPatchFile[] {
+  const files: PRPatchFile[] = [];
+  const fileBlocks = diff.split(/^diff --git /m).slice(1);
+  
+  for (const block of fileBlocks) {
+    const lines = block.split('\n');
+    const firstLine = lines[0];
+    
+    // Parse file path from "a/file b/file" format
+    const pathMatch = firstLine.match(/a\/(.+?) b\/(.+?)$/);
+    if (!pathMatch) continue;
+    
+    const filePath = pathMatch[2];
+    let status: 'added' | 'modified' | 'deleted' = 'modified';
+    let additions = 0;
+    let deletions = 0;
+    
+    // Check for new/deleted files
+    if (block.includes('new file mode')) {
+      status = 'added';
+    } else if (block.includes('deleted file mode')) {
+      status = 'deleted';
+    }
+    
+    // Count additions and deletions
+    for (const line of lines) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        additions++;
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        deletions++;
+      }
+    }
+    
+    files.push({
+      path: filePath,
+      status,
+      additions,
+      deletions,
+      diff: block
+    });
+  }
+  
+  return files;
+}
+
+function generateArtifactPath(title: string): string {
+  const repoRoot = getRepoRoot();
+  const artifactsDir = path.join(repoRoot, 'artifacts');
+  
+  // Ensure artifacts directory exists
+  if (!fs.existsSync(artifactsDir)) {
+    fs.mkdirSync(artifactsDir, { recursive: true });
+  }
+  
+  // Create safe filename from title
+  const safeTitle = title.replace(/[^a-zA-Z0-9-_]/g, '-').substring(0, 50);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  
+  return path.join(artifactsDir, `PR-${safeTitle}-${timestamp}.json`);
+}
+
+export async function icnGeneratePRPatch(request: GeneratePRPatchRequest): Promise<GeneratePRPatchResponse> {
+  const repoRoot = getRepoRoot();
+  const baseBranch = request.baseBranch || 'main';
+  const targetBranch = request.targetBranch || 'HEAD';
+  
+  try {
+    // Get changed files from git or from request
+    const changedFiles = request.changedFiles || await getChangedFiles(baseBranch, targetBranch);
+    
+    // Check policy before proceeding
+    const policyRequest: PolicyCheckRequest = {
+      changeset: changedFiles,
+      actor: request.actor || 'unknown'
+    };
+    
+    const policyResult = await icnCheckPolicy(policyRequest);
+    
+    // Get git diff
+    const diff = await getGitDiff(baseBranch, targetBranch);
+    const files = parseDiffOutput(diff);
+    
+    // Calculate totals
+    const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
+    const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
+    
+    // Create PR descriptor
+    const prDescriptor: PRPatchDescriptor = {
+      title: request.title,
+      description: request.description,
+      files,
+      baseBranch,
+      targetBranch,
+      totalAdditions,
+      totalDeletions,
+      policyCheck: {
+        allowed: policyResult.allow,
+        reasons: policyResult.reasons,
+        suggestions: policyResult.suggestions
+      }
+    };
+    
+    // Save artifact
+    const artifactPath = generateArtifactPath(request.title);
+    fs.writeFileSync(artifactPath, JSON.stringify(prDescriptor, null, 2), 'utf8');
+    
+    prDescriptor.artifact = {
+      path: path.relative(repoRoot, artifactPath),
+      created: new Date().toISOString()
+    };
+    
+    const response: GeneratePRPatchResponse = {
+      success: true,
+      prDescriptor
+    };
+    
+    // Create GitHub PR if requested (placeholder - would need GitHub API integration)
+    if (request.createGitHubPR) {
+      response.githubPR = {
+        created: false,
+        error: 'GitHub PR creation not implemented - local artifact created instead'
+      };
+    }
+    
+    return response;
+  } catch (error) {
+    throw new Error(`Failed to generate PR patch: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}

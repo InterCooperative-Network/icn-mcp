@@ -1009,6 +1009,227 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['description', 'category', 'scope', 'stakeholders']
       }
+    },
+    {
+      name: 'icn_search_files',
+      description: 'Search for files in the repository using glob patterns',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          pattern: {
+            type: 'string',
+            description: 'Glob pattern to search for files (e.g., "**/*.ts", "src/**/*.js")'
+          },
+          directory: {
+            type: 'string',
+            description: 'Optional directory to search within (relative to repo root)'
+          },
+          includeHidden: {
+            type: 'boolean',
+            description: 'Whether to include hidden files and directories'
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Maximum number of results to return (default: 50)',
+            minimum: 1,
+            maximum: 200
+          }
+        },
+        required: ['pattern']
+      }
+    },
+    {
+      name: 'icn_read_file',
+      description: 'Read the contents of a file within the repository',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filePath: {
+            type: 'string',
+            description: 'Path to the file to read (relative or absolute within repo)'
+          },
+          startLine: {
+            type: 'number',
+            description: 'Optional starting line number (1-based)'
+          },
+          endLine: {
+            type: 'number',
+            description: 'Optional ending line number (1-based)'
+          },
+          maxLines: {
+            type: 'number',
+            description: 'Maximum number of lines to read',
+            minimum: 1,
+            maximum: 1000
+          }
+        },
+        required: ['filePath']
+      }
+    },
+    {
+      name: 'icn_write_patch',
+      description: 'Write or patch a file with policy enforcement',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filePath: {
+            type: 'string',
+            description: 'Path to the file to write (relative or absolute within repo)'
+          },
+          content: {
+            type: 'string',
+            description: 'Content to write to the file'
+          },
+          createIfNotExists: {
+            type: 'boolean',
+            description: 'Whether to create the file if it does not exist'
+          },
+          actor: {
+            type: 'string',
+            description: 'Actor performing the write operation (for policy checking)'
+          },
+          description: {
+            type: 'string',
+            description: 'Description of the changes being made'
+          }
+        },
+        required: ['filePath', 'content']
+      }
+    },
+    {
+      name: 'icn_run_tests',
+      description: 'Run tests and provide summarized results',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          testType: {
+            type: 'string',
+            enum: ['npm', 'cargo', 'just', 'custom'],
+            description: 'Type of test runner to use'
+          },
+          testCommand: {
+            type: 'string',
+            description: 'Custom test command to run'
+          },
+          workspace: {
+            type: 'string',
+            description: 'Specific workspace to test (for npm workspaces)'
+          },
+          testFile: {
+            type: 'string',
+            description: 'Specific test file to run'
+          },
+          timeout: {
+            type: 'number',
+            description: 'Timeout in milliseconds (default: 120000)',
+            minimum: 1000,
+            maximum: 600000
+          }
+        }
+      }
+    },
+    {
+      name: 'icn_run_linters',
+      description: 'Run linters and code quality checks with summarized results',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          linterType: {
+            type: 'string',
+            enum: ['eslint', 'prettier', 'tsc', 'custom'],
+            description: 'Type of linter to run'
+          },
+          linterCommand: {
+            type: 'string',
+            description: 'Custom linter command to run'
+          },
+          workspace: {
+            type: 'string',
+            description: 'Specific workspace to lint (for npm workspaces)'
+          },
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Specific files to lint'
+          },
+          fix: {
+            type: 'boolean',
+            description: 'Whether to automatically fix issues when possible'
+          },
+          timeout: {
+            type: 'number',
+            description: 'Timeout in milliseconds (default: 60000)',
+            minimum: 1000,
+            maximum: 300000
+          }
+        }
+      }
+    },
+    {
+      name: 'icn_generate_pr_patch',
+      description: 'Generate PR patches and descriptors with policy validation',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: {
+            type: 'string',
+            description: 'Title for the PR'
+          },
+          description: {
+            type: 'string',
+            description: 'Description of the changes'
+          },
+          changedFiles: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of changed files (auto-detected from git if not provided)'
+          },
+          baseBranch: {
+            type: 'string',
+            description: 'Base branch for comparison (default: main)'
+          },
+          targetBranch: {
+            type: 'string',
+            description: 'Target branch for comparison (default: HEAD)'
+          },
+          actor: {
+            type: 'string',
+            description: 'Actor creating the PR (for policy checking)'
+          },
+          createGitHubPR: {
+            type: 'boolean',
+            description: 'Whether to attempt creating a GitHub PR (creates local artifact if false)'
+          }
+        },
+        required: ['title', 'description']
+      }
+    },
+    {
+      name: 'icn_explain_test_failures',
+      description: 'Analyze test failures and provide explanations and suggestions',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          testOutput: {
+            type: 'string',
+            description: 'Test output containing failures to analyze'
+          },
+          testType: {
+            type: 'string',
+            enum: ['npm', 'vitest', 'jest', 'cargo', 'mocha', 'custom'],
+            description: 'Type of test framework that generated the output'
+          },
+          testCommand: {
+            type: 'string',
+            description: 'Command that was run to generate the test output'
+          },
+          context: {
+            type: 'string',
+            description: 'Additional context about the test run'
+          }
+        },
+        required: ['testOutput']
+      }
     }
   ];
 }

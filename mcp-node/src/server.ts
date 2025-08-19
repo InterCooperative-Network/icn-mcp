@@ -44,6 +44,13 @@ import { icnBuildGovernanceFlow } from './tools/icn_build_governance_flow.js';
 import { icnAdviseVoting } from './tools/icn_advise_voting.js';
 import { icnManageSortition } from './tools/icn_manage_sortition.js';
 import { icnBuildPolicy } from './tools/icn_build_policy.js';
+import { icnSearchFiles } from './tools/icn_search_files.js';
+import { icnReadFile } from './tools/icn_read_file.js';
+import { icnWritePatch } from './tools/icn_write_patch.js';
+import { icnRunTests } from './tools/icn_run_tests.js';
+import { icnRunLinters } from './tools/icn_run_linters.js';
+import { icnGeneratePRPatch } from './tools/icn_generate_pr_patch.js';
+import { icnExplainTestFailures } from './tools/icn_explain_test_failures.js';
 import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/index.js';
 
 class ICNMCPServer {
@@ -707,6 +714,188 @@ class ICNMCPServer {
               scope: args.scope as any,
               stakeholders: args.stakeholders as any,
               constraints
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_search_files': {
+            if (!args?.pattern || typeof args.pattern !== 'string') {
+              throw new Error('pattern parameter is required and must be a string');
+            }
+            const directory = typeof args.directory === 'string' ? args.directory : undefined;
+            const includeHidden = typeof args.includeHidden === 'boolean' ? args.includeHidden : false;
+            const maxResults = typeof args.maxResults === 'number' ? args.maxResults : 50;
+            
+            const result = await executeWithTimeout(() => icnSearchFiles({
+              pattern: args.pattern as string,
+              directory,
+              includeHidden,
+              maxResults
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_read_file': {
+            if (!args?.filePath || typeof args.filePath !== 'string') {
+              throw new Error('filePath parameter is required and must be a string');
+            }
+            const startLine = typeof args.startLine === 'number' ? args.startLine : undefined;
+            const endLine = typeof args.endLine === 'number' ? args.endLine : undefined;
+            const maxLines = typeof args.maxLines === 'number' ? args.maxLines : undefined;
+            
+            const result = await executeWithTimeout(() => icnReadFile({
+              filePath: args.filePath as string,
+              startLine,
+              endLine,
+              maxLines
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_write_patch': {
+            if (!args?.filePath || typeof args.filePath !== 'string') {
+              throw new Error('filePath parameter is required and must be a string');
+            }
+            if (!args?.content || typeof args.content !== 'string') {
+              throw new Error('content parameter is required and must be a string');
+            }
+            const createIfNotExists = typeof args.createIfNotExists === 'boolean' ? args.createIfNotExists : false;
+            const actor = typeof args.actor === 'string' ? args.actor : undefined;
+            const description = typeof args.description === 'string' ? args.description : undefined;
+            
+            const result = await executeWithTimeout(() => icnWritePatch({
+              filePath: args.filePath as string,
+              content: args.content as string,
+              createIfNotExists,
+              actor,
+              description
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_run_tests': {
+            const testType = typeof args?.testType === 'string' ? args.testType as any : undefined;
+            const testCommand = typeof args?.testCommand === 'string' ? args.testCommand : undefined;
+            const workspace = typeof args?.workspace === 'string' ? args.workspace : undefined;
+            const testFile = typeof args?.testFile === 'string' ? args.testFile : undefined;
+            const timeout = typeof args?.timeout === 'number' ? args.timeout : undefined;
+            
+            const result = await executeWithTimeout(() => icnRunTests({
+              testType,
+              testCommand,
+              workspace,
+              testFile,
+              timeout
+            }), timeout || 120000);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_run_linters': {
+            const linterType = typeof args?.linterType === 'string' ? args.linterType as any : undefined;
+            const linterCommand = typeof args?.linterCommand === 'string' ? args.linterCommand : undefined;
+            const workspace = typeof args?.workspace === 'string' ? args.workspace : undefined;
+            const files = Array.isArray(args?.files) ? args.files : undefined;
+            const fix = typeof args?.fix === 'boolean' ? args.fix : false;
+            const timeout = typeof args?.timeout === 'number' ? args.timeout : undefined;
+            
+            const result = await executeWithTimeout(() => icnRunLinters({
+              linterType,
+              linterCommand,
+              workspace,
+              files,
+              fix,
+              timeout
+            }), timeout || 60000);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_generate_pr_patch': {
+            if (!args?.title || typeof args.title !== 'string') {
+              throw new Error('title parameter is required and must be a string');
+            }
+            if (!args?.description || typeof args.description !== 'string') {
+              throw new Error('description parameter is required and must be a string');
+            }
+            const changedFiles = Array.isArray(args.changedFiles) ? args.changedFiles : undefined;
+            const baseBranch = typeof args.baseBranch === 'string' ? args.baseBranch : undefined;
+            const targetBranch = typeof args.targetBranch === 'string' ? args.targetBranch : undefined;
+            const actor = typeof args.actor === 'string' ? args.actor : undefined;
+            const createGitHubPR = typeof args.createGitHubPR === 'boolean' ? args.createGitHubPR : false;
+            
+            const result = await executeWithTimeout(() => icnGeneratePRPatch({
+              title: args.title as string,
+              description: args.description as string,
+              changedFiles,
+              baseBranch,
+              targetBranch,
+              actor,
+              createGitHubPR
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_explain_test_failures': {
+            if (!args?.testOutput || typeof args.testOutput !== 'string') {
+              throw new Error('testOutput parameter is required and must be a string');
+            }
+            const testType = typeof args.testType === 'string' ? args.testType as any : undefined;
+            const testCommand = typeof args.testCommand === 'string' ? args.testCommand : undefined;
+            const context = typeof args.context === 'string' ? args.context : undefined;
+            
+            const result = await executeWithTimeout(() => icnExplainTestFailures({
+              testOutput: args.testOutput as string,
+              testType,
+              testCommand,
+              context
             }));
             return {
               content: [
