@@ -3,6 +3,10 @@ on:
   pull_request:
   push:
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -70,14 +74,15 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags }},icn-mcp:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+          load: ${{ github.event_name == 'pull_request' }}
 
       - name: Run Hadolint (Dockerfile linter)
         uses: hadolint/hadolint-action@v3.1.0
@@ -85,18 +90,41 @@ jobs:
           dockerfile: Dockerfile
           failure-threshold: warning
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+      - name: Trivy FS scan (SARIF)
+        uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          scan-type: 'fs'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          ignore-unfixed: true
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+      - name: Trivy Image scan (SARIF)
+        uses: aquasecurity/trivy-action@0.20.0
         with:
-          sarif_file: 'trivy-results.sarif'
+          image-ref: 'icn-mcp:latest'
+          format: 'sarif'
+          output: 'trivy-image.sarif'
+          ignore-unfixed: true
+
+      - name: Upload Trivy FS SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: |
+          always() &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) &&
+          hashFiles('trivy-results.sarif') != ''
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+      - name: Upload Trivy Image SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: |
+          always() &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) &&
+          hashFiles('trivy-image.sarif') != ''
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
 
       - name: Generate SBOM
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
