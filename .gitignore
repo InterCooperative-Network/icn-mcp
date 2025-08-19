@@ -3,7 +3,10 @@ dist
 coverage
 .env*
 *.sqlite
+*.db
 var/
 branches/
 artifacts/
+test-tmp/
+**/test-tmp/
 
