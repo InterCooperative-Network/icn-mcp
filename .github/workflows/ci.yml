@@ -3,6 +3,10 @@ on:
   pull_request:
   push:
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -37,4 +41,151 @@ jobs:
       - run: npm test -ws --if-present
 
       - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute short SHA
+        id: vars
+        run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=sha-${{ steps.vars.outputs.short }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}${{ github.event_name == 'pull_request' && ',icn-mcp:latest' || '' }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          load: ${{ github.event_name == 'pull_request' }}
+
+      - name: Run Hadolint (Dockerfile linter)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+
+      - name: Compute weekly cache key
+        id: week
+        run: echo "key=trivy-${{ runner.os }}-$(date +%Y-%V)" >> $GITHUB_OUTPUT
+
+      - name: Cache Trivy DB
+        id: trivy-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/trivy
+            ~/.cache/trivy-java
+          key: ${{ steps.week.outputs.key }}
+
+      - name: Trivy FS scan (SARIF)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'fs'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          ignore-unfixed: true
+          vuln-type: os,library
+          db-repository: ghcr.io/aquasecurity/trivy-db:2
+          java-db-repository: ghcr.io/aquasecurity/trivy-java-db:1
+
+      - name: Verify image is present
+        id: have_image
+        run: |
+          if docker image inspect icn-mcp:latest >/dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trivy Image scan (online try)
+        id: trivy-online
+        if: steps.have_image.outputs.present == 'true'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: image
+          image-ref: icn-mcp:latest
+          format: sarif
+          output: trivy-image.sarif
+          ignore-unfixed: true
+          vuln-type: os,library
+          db-repository: ghcr.io/aquasecurity/trivy-db:2
+          java-db-repository: ghcr.io/aquasecurity/trivy-java-db:1
+          timeout: 10m
+
+      - name: Trivy Image scan (offline fallback)
+        if: steps.have_image.outputs.present == 'true' && failure()
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: image
+          image-ref: icn-mcp:latest
+          format: sarif
+          output: trivy-image.sarif
+          ignore-unfixed: true
+          vuln-type: os,library
+
+      - name: Upload Trivy FS SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: |
+          always() &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) &&
+          hashFiles('trivy-results.sarif') != ''
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+      - name: Upload Trivy Image SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: |
+          always() &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) &&
+          hashFiles('trivy-image.sarif') != ''
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      - name: Generate SBOM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository }}:latest
+          output-file: sbom.spdx.json
+          format: spdx-json
+
+      - name: Upload SBOM artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
 

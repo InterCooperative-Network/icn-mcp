@@ -76,10 +76,46 @@ app.addHook('onClose', async () => {
 });
 
 const port = Number(process.env.PORT || 8787);
-app.listen({ port, host: '0.0.0.0' })
-  .then(() => app.log.info({ port }, 'MCP server listening'))
-  .catch((e) => { 
-    app.log.error(e, 'Failed to start server'); 
-    process.exit(1); 
-  });
+
+// Start server
+const start = async () => {
+  try {
+    await app.listen({ port, host: '0.0.0.0' });
+    app.log.info({ port }, 'MCP server listening');
+  } catch (err) {
+    app.log.error(err, 'Failed to start server');
+    process.exit(1);
+  }
+};
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal: string) => {
+  app.log.info({ signal }, 'Received shutdown signal, starting graceful shutdown');
+  
+  try {
+    await app.close();
+    app.log.info('Server closed successfully');
+    process.exit(0);
+  } catch (err) {
+    app.log.error(err, 'Error during shutdown');
+    process.exit(1);
+  }
+};
+
+// Register signal handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (err) => {
+  app.log.fatal(err, 'Uncaught exception');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  app.log.fatal({ reason, promise }, 'Unhandled rejection');
+  process.exit(1);
+});
+
+start();
 

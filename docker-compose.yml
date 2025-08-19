@@ -1,0 +1,129 @@
+version: "3.9"
+
+services:
+  mcp:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: icn-mcp:latest
+    environment:
+      - NODE_ENV=production
+      - PORT=8787
+      - MCP_DB_PATH=/data/icn-mcp.sqlite
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # GitHub configuration (override in .env)
+      - GITHUB_OWNER=${GITHUB_OWNER:-InterCooperative-Network}
+      - GITHUB_REPO=${GITHUB_REPO:-icn-mcp}
+      - GITHUB_DEFAULT_BRANCH=${GITHUB_DEFAULT_BRANCH:-main}
+      # Optional GitHub token for API access
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Rate limiting
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      # Admin tokens (override in .env)
+      - MAINTAINER_ADMIN_TOKEN=${MAINTAINER_ADMIN_TOKEN:-}
+      - MAINTAINER_TOKENS=${MAINTAINER_TOKENS:-}
+    ports:
+      - "8787:8787"
+    volumes:
+      - mcp-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8787/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "512M"
+        reservations:
+          cpus: "0.25"
+          memory: "128M"
+    ulimits:
+      nofile: 65535
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    networks:
+      - icn-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command: 
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./deployment/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - icn-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "256M"
+        reservations:
+          cpus: "0.1"
+          memory: "64M"
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployment/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deployment/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - icn-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "256M"
+        reservations:
+          cpus: "0.1"
+          memory: "64M"
+
+secrets:
+  grafana_admin_password:
+    file: ./deployment/secrets/grafana_admin_password.txt
+
+volumes:
+  mcp-data:
+    driver: local
+  prom-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  icn-network:
+    driver: bridge
