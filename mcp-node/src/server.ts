@@ -61,10 +61,13 @@ import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/ind
 import { ConsentManager } from './consent/index.js';
 import { ICN_MCP_LOG_DIR, ICN_MCP_LOG_MAX_KB } from './config.js';
 import { readRecentLogs } from './utils/logs.js';
+import { ResourceService, PromptService } from './services/index.js';
 
 class ICNMCPServer {
   private server: Server;
   private healthCheckInterval?: ReturnType<typeof setInterval>;
+  private resourceService: ResourceService;
+  private promptService: PromptService;
 
   constructor() {
     this.server = new Server(
@@ -87,6 +90,9 @@ class ICNMCPServer {
         },
       }
     );
+
+    this.resourceService = new ResourceService();
+    this.promptService = new PromptService();
 
     this.setupToolHandlers();
     this.setupResourceHandlers();
@@ -1078,14 +1084,14 @@ class ICNMCPServer {
   private setupResourceHandlers() {
     // List available resources
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      const resources = await this.listResources();
+      const resources = await this.resourceService.listResources();
       return { resources };
     });
 
     // Handle resource reads
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
-      const contents = await this.readResource(uri);
+      const contents = await this.resourceService.readResource(uri);
       return { contents };
     });
   }
@@ -1280,45 +1286,17 @@ class ICNMCPServer {
   private setupPromptHandlers() {
     // List available prompts
     this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      const prompts = listAllPrompts().map(prompt => ({
-        name: prompt.name,
-        description: prompt.description,
-        arguments: prompt.arguments.map(arg => ({
-          name: arg.name,
-          description: arg.description,
-          required: arg.required ?? false,
-        })),
-      }));
+      const prompts = await this.promptService.listPrompts();
       return { prompts };
     });
 
     // Get specific prompt
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      
-      // Validate prompt exists
-      const promptMeta = getPromptMetadata(name);
-      if (!promptMeta) {
-        throw new Error(`Prompt '${name}' not found`);
-      }
-
-      // Generate prompt with provided arguments
-      const result = generatePrompt(name, args || {});
-      if (!result.success) {
-        throw new Error(`Failed to generate prompt: ${result.errors?.join(', ')}`);
-      }
-
+      const promptResponse = await this.promptService.getPrompt(name, args || {});
       return {
-        description: promptMeta.description,
-        messages: [
-          {
-            role: 'user' as const,
-            content: {
-              type: 'text' as const,
-              text: result.content!,
-            },
-          },
-        ],
+        description: promptResponse.description,
+        messages: promptResponse.messages,
       };
     });
   }
