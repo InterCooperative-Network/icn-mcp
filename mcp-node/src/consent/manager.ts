@@ -32,7 +32,6 @@ export class ConsentManager {
       neverRequireConsent: [
         'icn_get_architecture',
         'icn_get_invariants',
-        'icn_check_policy',
         'icn_get_task_context'
       ],
       consentTimeoutSeconds: 300, // 5 minutes
@@ -167,11 +166,9 @@ export class ConsentManager {
     );
   }
 
-  /**
-   * Revoke consent for a tool and user
-   */
   revokeConsentDecision(userId: string, toolName: string, resource?: string): boolean {
-    return revokeConsent(userId, toolName, resource);
+    const normalizedResource = resource ?? null;
+    return revokeConsent(userId, toolName, normalizedResource ?? undefined);
   }
 
   /**
@@ -185,11 +182,17 @@ export class ConsentManager {
    * Check if a tool requires consent based on risk threshold and configuration
    */
   requiresConsentForUser(toolName: string, _userId?: string, _resource?: string): boolean {
-    // Apply regular consent rules first
+    // Apply environment override first
+    if (this.config.requireConsentForAll) {
+      return true;
+    }
+    
+    // Check never require list
     if (this.config.neverRequireConsent.includes(toolName)) {
       return false;
     }
     
+    // Check always require list
     if (this.config.alwaysRequireConsent.includes(toolName)) {
       return true;
     }
@@ -197,7 +200,7 @@ export class ConsentManager {
     // Check risk threshold
     if (this.config.riskThreshold) {
       const riskLevel = this.assessRiskLevel(toolName, {});
-      const riskLevels = ['low', 'medium', 'high'];
+      const riskLevels: Array<'low' | 'medium' | 'high'> = ['low', 'medium', 'high'];
       const toolRiskIndex = riskLevels.indexOf(riskLevel);
       const thresholdIndex = riskLevels.indexOf(this.config.riskThreshold);
       
@@ -206,7 +209,7 @@ export class ConsentManager {
       }
     }
     
-    return this.config.requireConsentForAll;
+    return false;
   }
 
   /**

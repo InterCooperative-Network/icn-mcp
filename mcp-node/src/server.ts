@@ -120,16 +120,30 @@ class ICNMCPServer {
       try {
         // Check if consent is required for this tool
         const consentManager = new ConsentManager();
-        const userId = args?.userId as string || 'anonymous'; // Default to anonymous if no userId provided
-        const resource = args?.resource as string; // Optional resource context
+        const userId = typeof args?.userId === 'string' && args.userId.trim() ? String(args.userId) : null;
         
         // Skip consent checking for consent tools themselves to avoid infinite loops
         if (name !== 'icn_request_consent' && name !== 'icn_process_consent') {
+          if (!userId) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    error: 'ConsentRequired',
+                    message: 'Provide a userId and re-try with icn_request_consent'
+                  }, null, 2),
+                },
+              ],
+            };
+          }
+          
+          const resource = args?.resource as string; // Optional resource context
           const requiresConsent = consentManager.requiresConsentForUser(name, userId, resource);
           
           if (requiresConsent) {
             // Check if user has already given consent
-            const existingConsent = consentManager.checkConsent(userId, name, resource);
+            const existingConsent = consentManager.checkConsent(userId, name, resource ?? null);
             
             if (!existingConsent || !existingConsent.approved) {
               // No consent found or consent was denied - block execution
@@ -139,11 +153,7 @@ class ICNMCPServer {
                     type: 'text',
                     text: JSON.stringify({
                       error: 'ConsentRequired',
-                      message: `User consent is required for tool '${name}'. Use icn_request_consent to obtain consent first.`,
-                      toolName: name,
-                      userId: userId,
-                      resource: resource,
-                      suggestion: `Call icn_request_consent with toolName: "${name}" to request user consent.`
+                      suggestion: 'Use icn_request_consent'
                     }, null, 2),
                   },
                 ],

@@ -27,6 +27,9 @@ describe('Consent Persistence and Enforcement', () => {
     // Set environment variable for test database
     process.env.MCP_DB_PATH = testDbPath;
     
+    // Reset db instance to ensure clean state
+    resetDbInstance();
+    
     // Initialize test database with consent table
     const db = new Database(testDbPath);
     db.exec(`

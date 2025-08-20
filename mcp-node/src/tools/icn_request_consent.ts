@@ -58,9 +58,6 @@ export async function icnRequestConsent(args: RequestConsentArgs): Promise<Reque
   };
 }
 
-/**
- * Process user consent response
- */
 export async function icnProcessConsent(args: {
   requestId: string;
   approved: boolean;
@@ -70,9 +67,14 @@ export async function icnProcessConsent(args: {
   resource?: string;
   expiresAt?: string;
 }): Promise<ConsentResponse> {
+  const normalized = {
+    ...args,
+    message: args.approved ? (args.message ?? 'Approved') : (args.message ?? 'User denied request'),
+  };
+
   const response: ConsentResponse = {
-    approved: args.approved,
-    message: args.message,
+    approved: normalized.approved,
+    message: normalized.message,
     timestamp: new Date().toISOString(),
     userId: args.userId,
     expiresAt: args.expiresAt
@@ -87,7 +89,7 @@ export async function icnProcessConsent(args: {
       const persistedDecision = consentManager.persistConsent(
         args.userId,
         args.toolName,
-        args.resource,
+        args.resource ?? undefined,
         response,
         riskLevel
       );
