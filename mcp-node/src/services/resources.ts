@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 
 interface Resource {
@@ -41,19 +42,17 @@ export class ResourceService {
         const packageJson = path.join(current, 'package.json');
         const gitDir = path.join(current, '.git');
         
-        // Use fs.accessSync to check existence
+        // Use fsSync.accessSync to check existence
         try {
-          const fs = require('node:fs');
-          fs.accessSync(packageJson);
+          fsSync.accessSync(packageJson);
           // Check if this is the root package.json (has workspaces)
-          const pkg = JSON.parse(fs.readFileSync(packageJson, 'utf-8'));
+          const pkg = JSON.parse(fsSync.readFileSync(packageJson, 'utf-8'));
           if (pkg.workspaces) {
             return current;
           }
         } catch {
           try {
-            const fs = require('node:fs');
-            fs.accessSync(gitDir);
+            fsSync.accessSync(gitDir);
             return current;
           } catch {
             // Continue searching if neither exists

@@ -118,7 +118,9 @@ export async function resourcesPromptsRoutes(f: FastifyInstance) {
 
       const contents = await resourceService.readResource(uri);
       
+      // Check if the resource returned an error (readResource always returns at least one item)
       if (!contents || contents.length === 0) {
+        // This should never happen given current implementation, but kept for safety
         req.log.warn({ reqId: req.id, uri }, 'Resource not found');
         return reply.code(404).send({
           ok: false,
