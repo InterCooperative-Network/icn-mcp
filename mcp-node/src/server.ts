@@ -59,6 +59,8 @@ import { icnRequestConsent, icnProcessConsent } from './tools/icn_request_consen
 import { icnReportProgress } from './tools/icn_progress.js';
 import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/index.js';
 import { ConsentManager } from './consent/index.js';
+import { ICN_MCP_LOG_DIR, ICN_MCP_LOG_MAX_KB } from './config.js';
+import { readRecentLogs } from './utils/logs.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -1159,7 +1161,7 @@ class ICNMCPServer {
         // File might not exist, continue
       }
 
-      // Recent logs (placeholder - in a real implementation this would read actual logs)
+      // Recent logs
       resources.push({
         uri: `icn://logs/recent`,
         name: 'Recent Logs',
@@ -1217,9 +1219,7 @@ class ICNMCPServer {
       }
 
       if (uri === 'icn://logs/recent') {
-        // In a real implementation, this would read actual logs
-        // For now, return a placeholder
-        const content = 'Recent logs placeholder - implement actual log reading based on your logging infrastructure';
+        const content = await readRecentLogs(ICN_MCP_LOG_DIR, { maxKilobytes: ICN_MCP_LOG_MAX_KB });
         return [{
           uri,
           mimeType: 'text/plain',
