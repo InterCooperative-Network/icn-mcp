@@ -3,6 +3,7 @@ import { healthRoute, apiRoutes } from './api.js';
 import { metricsRoute } from './metrics.js';
 import { rateLimitMiddleware, initRateLimitCleanup, stopRateLimitCleanup } from './auth.js';
 import { registerWorkflowRoutes } from './workflow-api.js';
+import { resourcesPromptsRoutes } from './resources-prompts-api.js';
 
 // Configure pino logger
 const isDev = process.env.NODE_ENV !== 'production';
@@ -95,6 +96,9 @@ app.register(metricsRoute);
 
 // Mount workflow routes at /workflow
 app.register(registerWorkflowRoutes, { prefix: '/workflow' });
+
+// Mount resources and prompts routes at /api
+app.register(resourcesPromptsRoutes, { prefix: '/api' });
 
 // 404 normalization (must come after routes are registered)
 app.setNotFoundHandler((req, reply) => {
