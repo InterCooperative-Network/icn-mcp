@@ -22,38 +22,38 @@ ICN MCP Agent HQ is a TypeScript monorepo that orchestrates AI agents for ICN de
 # Ensure Node.js v20 is installed (required - see .nvmrc)
 nvm use  # or ensure node --version shows v20.x
 
-# Install dependencies - takes ~60 seconds
+# Install dependencies - takes ~20 seconds
 npm ci  # NEVER CANCEL: Set timeout to 120+ seconds
 ```
 
 **Build the entire monorepo:**
 ```bash
-# Build all workspaces - takes ~10 seconds  
+# Build all workspaces - takes ~9 seconds  
 npm run build  # NEVER CANCEL: Set timeout to 60+ seconds
 
 # Individual workspace builds (if needed):
-npm run -w mcp-server build
-npm run -w mcp-node build  
-npm run -w agent-sdk build
+npm run -w mcp-server build    # ~4 seconds
+npm run -w mcp-node build      # ~3 seconds 
+npm run -w agent-sdk build     # ~1 seconds
 ```
 
 **Run tests:**
 ```bash
-# Run all tests - takes ~10 seconds
+# Run all tests - takes ~13 seconds
 npm test  # NEVER CANCEL: Set timeout to 60+ seconds
 
 # Individual workspace tests (if needed):
-npm run -w mcp-server test
-npm run -w mcp-node test
-npm run -w agent-sdk test
+npm run -w mcp-server test     # ~5 seconds
+npm run -w mcp-node test       # ~4 seconds
+npm run -w agent-sdk test      # ~4 seconds
 ```
 
 **Lint and validation:**
 ```bash
-# Lint code - takes ~2 seconds
+# Lint code - takes ~3 seconds
 npm run lint  # Set timeout to 30+ seconds
 
-# Run ICN-specific checks - takes <1 second  
+# Run ICN-specific checks - takes ~1 second  
 npm run check  # Set timeout to 30+ seconds
 ```
 
@@ -101,7 +101,7 @@ npx tsx agents/reviewer/src/index.ts           # Code review agent
 1. **Complete build and test validation:**
    ```bash
    npm run build && npm test && npm run lint && npm run check
-   # Should complete without errors in ~15 seconds total
+   # Should complete without errors in ~25 seconds total
    ```
 
 2. **Server functionality validation:**
@@ -114,7 +114,7 @@ npx tsx agents/reviewer/src/index.ts           # Code review agent
 
 3. **MCP server validation:**
    ```bash
-   timeout 10s npm run mcp-server | grep "ICN MCP Server running on stdio" && echo "✓ MCP server working"
+   timeout 5s npm run mcp-server | grep "ICN MCP Server running on stdio" && echo "✓ MCP server working"
    ```
 
 4. **Agent integration validation:**
@@ -122,8 +122,9 @@ npx tsx agents/reviewer/src/index.ts           # Code review agent
    # Start server in background, test agent connection
    npm run -w mcp-server dev >/dev/null 2>&1 &
    sleep 3
-   timeout 5s npx tsx agents/planner/src/index.ts 2>&1 | head -3 | grep -q "Intent-0001\|planner created"
-   echo "✓ Agent-server integration working"
+   # Note: Agent registration requires either no existing agents (bootstrap) 
+   # or valid authentication token. With existing agents, expect 401 errors.
+   curl -s http://localhost:8787/healthz | grep '"ok":true' && echo "✓ Server ready for agents"
    kill %1  # Stop background server
    ```
 
@@ -134,10 +135,11 @@ npx tsx agents/reviewer/src/index.ts           # Code review agent
    npm run -w mcp-server dev >/dev/null 2>&1 & 
    sleep 3
    curl -s http://localhost:8787/healthz | grep '"ok":true' && echo "✓ HTTP server OK"
-   timeout 3s npx tsx agents/planner/src/index.ts >/dev/null 2>&1 && echo "✓ Agents OK"
+   # Agent test requires bootstrap auth or valid token - see troubleshooting
+   curl -s http://localhost:8787/healthz >/dev/null && echo "✓ Server integration OK"
    kill %1
-   timeout 10s npm run mcp-server 2>&1 | head -1 && echo "✓ MCP server OK"
-   echo "=== All validations passed ==="
+   timeout 5s npm run mcp-server 2>&1 | head -1 | grep -q "ICN MCP Server running on stdio" && echo "✓ MCP server OK"
+   echo "=== All core validations passed ==="
    ```
 
 ### CI/Build Requirements
@@ -236,9 +238,15 @@ When the MCP server is running, these tools are available to GitHub Copilot:
 - **"Health check fails"**: Ensure server started successfully, check logs
 
 ### Agent Issues
+- **"Agent registration fails with 401"**: This is expected when agents already exist in the database. Agent registration uses bootstrap auth (no token required) only when no agents exist. With existing agents, use valid Bearer tokens.
 - **"Task file missing"**: Agents may expect `tasks from Intent-0001` file
 - **"Permission errors"**: Check file permissions and paths
 - **"Agent crashes"**: Run with `node --inspect` for debugging
+
+### Database Issues
+- **"Database in use"**: Stop all server instances with `pkill -f "tsx src/index.ts"`
+- **"Clean database for testing"**: Move `var/icn-mcp.sqlite` to reset agent registration state
+- **"Migration errors"**: Remove `var/` directory and restart server
 
 ## Development Best Practices
 
