@@ -55,9 +55,10 @@ import { icnRunLinters } from './tools/icn_run_linters.js';
 import { icnGeneratePRPatch } from './tools/icn_generate_pr_patch.js';
 import { icnExplainTestFailures } from './tools/icn_explain_test_failures.js';
 import { icnDisplayTools } from './tools/icn_display_tools.js';
-import { icnRequestConsent } from './tools/icn_request_consent.js';
+import { icnRequestConsent, icnProcessConsent } from './tools/icn_request_consent.js';
 import { icnReportProgress } from './tools/icn_progress.js';
 import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/index.js';
+import { ConsentManager } from './consent/index.js';
 
 class ICNMCPServer {
   private server: Server;
@@ -117,6 +118,43 @@ class ICNMCPServer {
       };
 
       try {
+        // Check if consent is required for this tool
+        const consentManager = new ConsentManager();
+        const userId = args?.userId as string || 'anonymous'; // Default to anonymous if no userId provided
+        const resource = args?.resource as string; // Optional resource context
+        
+        // Skip consent checking for consent tools themselves to avoid infinite loops
+        if (name !== 'icn_request_consent' && name !== 'icn_process_consent') {
+          const requiresConsent = consentManager.requiresConsentForUser(name, userId, resource);
+          
+          if (requiresConsent) {
+            // Check if user has already given consent
+            const existingConsent = consentManager.checkConsent(userId, name, resource);
+            
+            if (!existingConsent || !existingConsent.approved) {
+              // No consent found or consent was denied - block execution
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'ConsentRequired',
+                      message: `User consent is required for tool '${name}'. Use icn_request_consent to obtain consent first.`,
+                      toolName: name,
+                      userId: userId,
+                      resource: resource,
+                      suggestion: `Call icn_request_consent with toolName: "${name}" to request user consent.`
+                    }, null, 2),
+                  },
+                ],
+              };
+            } else {
+              // Log the consent usage
+              console.log(`[CONSENT] Using existing consent for ${userId}/${name}: ${existingConsent.id}`);
+            }
+          }
+        }
+
         switch (name) {
           case 'icn_get_architecture': {
             const task = typeof args?.task === 'string' ? args.task : undefined;
@@ -944,6 +982,33 @@ class ICNMCPServer {
               toolName: args.toolName as string,
               toolArgs,
               context
+            }));
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'icn_process_consent': {
+            if (!args?.requestId || typeof args.requestId !== 'string') {
+              throw new Error('requestId parameter is required and must be a string');
+            }
+            if (typeof args.approved !== 'boolean') {
+              throw new Error('approved parameter is required and must be a boolean');
+            }
+            
+            const result = await executeWithTimeout(() => icnProcessConsent({
+              requestId: args.requestId as string,
+              approved: args.approved as boolean,
+              message: typeof args.message === 'string' ? args.message : undefined,
+              userId: typeof args.userId === 'string' ? args.userId : undefined,
+              toolName: typeof args.toolName === 'string' ? args.toolName : undefined,
+              resource: typeof args.resource === 'string' ? args.resource : undefined,
+              expiresAt: typeof args.expiresAt === 'string' ? args.expiresAt : undefined
             }));
             return {
               content: [

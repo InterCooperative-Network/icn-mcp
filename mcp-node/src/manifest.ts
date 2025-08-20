@@ -1268,6 +1268,44 @@ export function generateToolManifest(): ToolManifest[] {
       }
     },
     {
+      name: 'icn_process_consent',
+      description: 'Process and persist user consent response for tool execution requests',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          requestId: {
+            type: 'string',
+            description: 'Unique ID of the consent request being responded to'
+          },
+          approved: {
+            type: 'boolean',
+            description: 'Whether the user approved or denied the request'
+          },
+          message: {
+            type: 'string',
+            description: 'Optional user message explaining the decision'
+          },
+          userId: {
+            type: 'string',
+            description: 'ID of the user making the consent decision'
+          },
+          toolName: {
+            type: 'string',
+            description: 'Name of the tool the consent decision applies to'
+          },
+          resource: {
+            type: 'string',
+            description: 'Optional specific resource the consent applies to'
+          },
+          expiresAt: {
+            type: 'string',
+            description: 'Optional expiration timestamp for the consent decision'
+          }
+        },
+        required: ['requestId', 'approved']
+      }
+    },
+    {
       name: 'icn_report_progress',
       description: 'Report execution progress and provide status updates for transparency during tool execution',
       inputSchema: {

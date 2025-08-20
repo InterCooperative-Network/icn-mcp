@@ -5,9 +5,11 @@
 import Database from 'better-sqlite3';
 import { PersistedConsentDecision } from './types.js';
 import { nanoid } from 'nanoid';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // Use the same database path resolution logic as the main server
-const defaultDbPath = process.env.MCP_DB_PATH || '../var/icn-mcp.sqlite';
+const defaultDbPath = process.env.MCP_DB_PATH || path.resolve(process.cwd(), '../var/icn-mcp.sqlite');
 
 let dbInstance: Database.Database | null = null;
 
@@ -16,10 +18,43 @@ function getDb(): Database.Database {
     return dbInstance;
   }
   
+  // Ensure directory exists
+  const dbDir = path.dirname(defaultDbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+  
   // Initialize database
   dbInstance = new Database(defaultDbPath);
   dbInstance.pragma('journal_mode = WAL');
   dbInstance.pragma('synchronous = NORMAL');
+  
+  // Create consent_decisions table if it doesn't exist (for standalone usage)
+  try {
+    dbInstance.prepare(`
+      CREATE TABLE IF NOT EXISTS consent_decisions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        tool_name TEXT NOT NULL,
+        resource TEXT,
+        approved INTEGER NOT NULL,
+        message TEXT,
+        risk_level TEXT NOT NULL CHECK (risk_level IN ('low', 'medium', 'high')),
+        timestamp INTEGER NOT NULL DEFAULT (unixepoch()),
+        expires_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        UNIQUE(user_id, tool_name, resource)
+      )
+    `).run();
+    
+    // Create indexes if they don't exist
+    dbInstance.prepare('CREATE INDEX IF NOT EXISTS idx_consent_decisions_lookup ON consent_decisions(user_id, tool_name, resource)').run();
+    dbInstance.prepare('CREATE INDEX IF NOT EXISTS idx_consent_decisions_tool ON consent_decisions(tool_name)').run();
+    dbInstance.prepare('CREATE INDEX IF NOT EXISTS idx_consent_decisions_user ON consent_decisions(user_id)').run();
+    dbInstance.prepare('CREATE INDEX IF NOT EXISTS idx_consent_decisions_expires ON consent_decisions(expires_at)').run();
+  } catch (error) {
+    // Ignore errors if table already exists or if running in main server context
+  }
   
   return dbInstance;
 }
