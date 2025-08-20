@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { healthRoute, apiRoutes } from './api.js';
 import { metricsRoute } from './metrics.js';
 import { rateLimitMiddleware, initRateLimitCleanup, stopRateLimitCleanup } from './auth.js';
+import { registerWorkflowRoutes } from './workflow-api.js';
 
 // Configure pino logger
 const isDev = process.env.NODE_ENV !== 'production';
@@ -65,9 +66,40 @@ app.addHook('preHandler', async (req, reply) => {
   await rateLimitMiddleware()(req, reply);
 });
 
+// Global error handler to normalize validation errors
+app.setErrorHandler((err: any, req, reply) => {
+  // Fastify validation error
+  if (err?.validation) {
+    return reply.status(400).send({
+      ok: false,
+      error: 'invalid_input',
+      message: 'Request failed schema validation',
+      issues: err.validation?.map((v: any) => ({
+        instancePath: v.instancePath,
+        message: v.message
+      })) ?? undefined
+    });
+  }
+  // Fallback
+  const status = err.statusCode || 500;
+  return reply.status(status).send({
+    ok: false,
+    error: status === 404 ? 'not_found' : 'internal_error',
+    message: err.message
+  });
+});
+
 app.register(healthRoute);
 app.register(apiRoutes, { prefix: '/api' });
 app.register(metricsRoute);
+
+// Mount workflow routes at /workflow
+app.register(registerWorkflowRoutes, { prefix: '/workflow' });
+
+// 404 normalization (must come after routes are registered)
+app.setNotFoundHandler((req, reply) => {
+  reply.status(404).send({ ok: false, error: 'not_found', message: 'Not found' });
+});
 
 // Initialize rate limit cleanup and register shutdown handler
 initRateLimitCleanup();

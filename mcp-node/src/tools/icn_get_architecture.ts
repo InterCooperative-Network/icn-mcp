@@ -12,8 +12,16 @@ export interface ArchitectureResponse {
   sections: ArchitectureSection[];
 }
 
-export async function icnGetArchitecture(task?: string): Promise<ArchitectureResponse> {
+export async function icnGetArchitecture(params?: { task?: unknown } | string): Promise<ArchitectureResponse> {
   const sections: ArchitectureSection[] = [];
+  
+  // Handle both string parameter and object parameter
+  let taskString: string | undefined;
+  if (typeof params === 'string') {
+    taskString = params;
+  } else if (typeof params === 'object' && params !== null && 'task' in params) {
+    taskString = typeof params.task === 'string' ? params.task : undefined;
+  }
   
   const architectureDocs = path.join(DOCS_ROOT, 'architecture');
   const protocolDocs = path.join(DOCS_ROOT, 'protocols');
@@ -27,7 +35,7 @@ export async function icnGetArchitecture(task?: string): Promise<ArchitectureRes
       const title = file.replace('.md', '').replace(/^\d+-/, '');
       
       // If task is specified, filter content for relevance
-      if (!task || isRelevantToTask(content, task)) {
+      if (!taskString || isRelevantToTask(content, taskString)) {
         sections.push({
           title: `Architecture: ${title}`,
           path: `docs/architecture/${file}`,
@@ -48,7 +56,7 @@ export async function icnGetArchitecture(task?: string): Promise<ArchitectureRes
       const title = file.replace('.md', '').replace(/^\d+-/, '');
       
       // If task is specified, filter content for relevance
-      if (!task || isRelevantToTask(content, task)) {
+      if (!taskString || isRelevantToTask(content, taskString)) {
         sections.push({
           title: `Protocol: ${title}`,
           path: `docs/protocols/${file}`,

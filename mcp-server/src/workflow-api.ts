@@ -20,7 +20,7 @@ import {
   icnWorkflow,
   icnGetWorkflowState,
   type AuthContext
-} from '@mcp-node/tools/icn_workflow';
+} from '@mcp-node/tools/icn_workflow.js';
 
 // Enhanced validation schemas with size limits
 const StartWorkflowRequest = z.object({
@@ -113,11 +113,11 @@ function handleWorkflowError(error: any, reply: any, context: { workflowId?: str
   return reply.code(500).send({ error: 'internal_error' });
 }
 
-export function registerWorkflowRoutes(f: FastifyInstance) {
+export async function registerWorkflowRoutes(f: FastifyInstance) {
   // Workflow management endpoints - these will integrate with MCP tools
   
   // List workflow templates
-  f.get('/workflow/templates', async (req, reply) => {
+  f.get('/templates', async (req, reply) => {
     try {
       const authContext = buildAuthContext(req);
       const result = await icnListWorkflowTemplates({ authContext });
@@ -133,7 +133,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   });
 
   // Start a new workflow
-  f.post('/workflow/start', { preHandler: requireAuth() }, async (req, reply) => {
+  f.post('/start', { preHandler: requireAuth() }, async (req, reply) => {
     try {
       const body = StartWorkflowRequest.parse(req.body);
       const authContext = buildAuthContext(req);
@@ -183,7 +183,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   });
 
   // Get workflow state  
-  f.get('/workflow/:workflowId', {
+  f.get('/:workflowId', {
     preHandler: requireAuth(),
     schema: {
       params: {
@@ -230,7 +230,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   });
 
   // Get next step in workflow
-  f.get('/workflow/:workflowId/next-step', {
+  f.get('/:workflowId/next-step', {
     preHandler: requireAuth(),
     schema: {
       params: {
@@ -270,7 +270,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   });
 
   // Create checkpoint
-  f.post('/workflow/checkpoint', { 
+  f.post('/checkpoint', { 
     preHandler: requireAuth()
   }, async (req, reply) => {
     try {
@@ -337,7 +337,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   });
 
   // Complete workflow step - forces completeStep=true server-side
-  f.post('/workflow/complete-step', { 
+  f.post('/complete-step', { 
     preHandler: requireAuth()
   }, async (req, reply) => {
     try {
@@ -404,7 +404,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   });
 
   // Orchestrate ad-hoc intents
-  f.post('/workflow/orchestrate', { 
+  f.post('/orchestrate', { 
     preHandler: requireAuth()
   }, async (req, reply) => {
     try {
@@ -459,7 +459,7 @@ export function registerWorkflowRoutes(f: FastifyInstance) {
   });
 
   // Workflow actions (pause, resume, fail)
-  f.post('/workflow/action', { 
+  f.post('/action', { 
     preHandler: requireAuth()
   }, async (req, reply) => {
     try {
