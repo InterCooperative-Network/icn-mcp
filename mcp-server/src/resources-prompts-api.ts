@@ -3,11 +3,6 @@ import { z } from 'zod';
 import { requireAuth } from '@/auth';
 import { checkPolicy } from './policy.js';
 
-// Schema for validating resource URI parameter
-const ResourceUriSchema = z.object({
-  uri: z.string().min(1),
-});
-
 // Schema for validating prompt name parameter
 const PromptNameSchema = z.object({
   name: z.string().min(1),

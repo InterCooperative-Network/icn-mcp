@@ -57,7 +57,6 @@ import { icnExplainTestFailures } from './tools/icn_explain_test_failures.js';
 import { icnDisplayTools } from './tools/icn_display_tools.js';
 import { icnRequestConsent, icnProcessConsent } from './tools/icn_request_consent.js';
 import { icnReportProgress } from './tools/icn_progress.js';
-import { listAllPrompts, generatePrompt, getPromptMetadata } from './prompts/index.js';
 import { ConsentManager } from './consent/index.js';
 import { ICN_MCP_LOG_DIR, ICN_MCP_LOG_MAX_KB } from './config.js';
 import { readRecentLogs } from './utils/logs.js';
