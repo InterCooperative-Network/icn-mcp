@@ -185,15 +185,7 @@ export class ConsentManager {
    * Check if a tool requires consent based on risk threshold and configuration
    */
   requiresConsentForUser(toolName: string, userId?: string, resource?: string): boolean {
-    // Check if user has already given consent
-    if (userId) {
-      const existingConsent = this.checkConsent(userId, toolName, resource);
-      if (existingConsent) {
-        return !existingConsent.approved; // If denied, still require consent
-      }
-    }
-
-    // Apply regular consent rules
+    // Apply regular consent rules first
     if (this.config.neverRequireConsent.includes(toolName)) {
       return false;
     }

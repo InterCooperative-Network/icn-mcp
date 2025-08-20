@@ -12,7 +12,8 @@ import {
   checkPersistedConsent, 
   revokeConsent, 
   getUserConsentHistory,
-  cleanupExpiredConsent 
+  cleanupExpiredConsent,
+  resetDbInstance 
 } from '../src/consent/persistence.js';
 import { icnProcessConsent } from '../src/tools/icn_request_consent.js';
 
@@ -45,11 +46,19 @@ describe('Consent Persistence and Enforcement', () => {
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         UNIQUE(user_id, tool_name, resource)
       );
+      
+      CREATE INDEX idx_consent_decisions_lookup ON consent_decisions(user_id, tool_name, resource);
+      CREATE INDEX idx_consent_decisions_tool ON consent_decisions(tool_name);
+      CREATE INDEX idx_consent_decisions_user ON consent_decisions(user_id);
+      CREATE INDEX idx_consent_decisions_expires ON consent_decisions(expires_at);
     `);
     db.close();
   });
 
   afterEach(() => {
+    // Reset database instance
+    resetDbInstance();
+    
     // Clean up test database
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);

@@ -60,6 +60,20 @@ function getDb(): Database.Database {
 }
 
 /**
+ * Reset database instance (for testing)
+ */
+export function resetDbInstance(): void {
+  if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch (error) {
+      // Ignore close errors
+    }
+    dbInstance = null;
+  }
+}
+
+/**
  * Store a consent decision in the database
  */
 export function persistConsentDecision(
