@@ -1230,6 +1230,74 @@ export function generateToolManifest(): ToolManifest[] {
         },
         required: ['testOutput']
       }
+    },
+    {
+      name: 'icn_display_tools',
+      description: 'Display available ICN MCP tools with descriptions, categories, and usage information for user transparency',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          category: {
+            type: 'string',
+            enum: ['architecture', 'policy', 'workflow', 'development', 'governance', 'economics'],
+            description: 'Optional category filter to show only tools in a specific category'
+          }
+        }
+      }
+    },
+    {
+      name: 'icn_request_consent',
+      description: 'Request user consent before executing potentially impactful actions, implementing MCP specification user interaction model',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          toolName: {
+            type: 'string',
+            description: 'Name of the tool requesting consent'
+          },
+          toolArgs: {
+            type: 'object',
+            description: 'Arguments for the tool (for analysis and transparency)'
+          },
+          context: {
+            type: 'string',
+            description: 'Additional context or reason for the action'
+          }
+        },
+        required: ['toolName']
+      }
+    },
+    {
+      name: 'icn_report_progress',
+      description: 'Report execution progress and provide status updates for transparency during tool execution',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          toolName: {
+            type: 'string',
+            description: 'Name of the tool reporting progress'
+          },
+          phase: {
+            type: 'string',
+            description: 'Current phase of execution'
+          },
+          progress: {
+            type: 'number',
+            minimum: 0,
+            maximum: 100,
+            description: 'Progress percentage (0-100)'
+          },
+          message: {
+            type: 'string',
+            description: 'Current status message'
+          },
+          details: {
+            type: 'object',
+            description: 'Additional details about the current state'
+          }
+        },
+        required: ['toolName', 'progress', 'message']
+      }
     }
   ];
 }

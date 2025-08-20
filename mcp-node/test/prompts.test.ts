@@ -14,13 +14,19 @@ describe('ICN Prompts', () => {
   describe('Template Management', () => {
     it('should have all required prompt templates', () => {
       const prompts = ICN_PROMPTS;
-      expect(prompts).toHaveLength(4);
+      expect(prompts).toHaveLength(9); // 4 original + 5 consent prompts
       
       const promptNames = prompts.map(p => p.name);
       expect(promptNames).toContain('code-review');
       expect(promptNames).toContain('adr-template');
       expect(promptNames).toContain('release-notes');
       expect(promptNames).toContain('governance-proposal');
+      // New consent prompts
+      expect(promptNames).toContain('tool_consent_request');
+      expect(promptNames).toContain('tool_progress_update');
+      expect(promptNames).toContain('tools_display');
+      expect(promptNames).toContain('consent_denied');
+      expect(promptNames).toContain('consent_approved');
     });
 
     it('should return prompt by name', () => {
@@ -39,12 +45,13 @@ describe('ICN Prompts', () => {
       expect(reviewPrompts[0].name).toBe('code-review');
 
       const documentationPrompts = getPromptsByCategory('documentation');
-      expect(documentationPrompts).toHaveLength(1);
-      expect(documentationPrompts[0].name).toBe('adr-template');
+      expect(documentationPrompts).toHaveLength(2); // adr-template + tools_display
+      expect(documentationPrompts.map(p => p.name)).toContain('adr-template');
+      expect(documentationPrompts.map(p => p.name)).toContain('tools_display');
 
       const workflowPrompts = getPromptsByCategory('workflow');
-      expect(workflowPrompts).toHaveLength(1);
-      expect(workflowPrompts[0].name).toBe('release-notes');
+      expect(workflowPrompts).toHaveLength(5); // release-notes + 4 consent workflow prompts
+      expect(workflowPrompts.map(p => p.name)).toContain('release-notes');
 
       const governancePrompts = getPromptsByCategory('governance');
       expect(governancePrompts).toHaveLength(1);
@@ -69,7 +76,7 @@ describe('ICN Prompts', () => {
 
     it('should list all prompts with full templates', () => {
       const allPrompts = listAllPrompts();
-      expect(allPrompts).toHaveLength(4);
+      expect(allPrompts).toHaveLength(9); // 4 original + 5 consent prompts
       
       for (const prompt of allPrompts) {
         expect(prompt.name).toBeDefined();
