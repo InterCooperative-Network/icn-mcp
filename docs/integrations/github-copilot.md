@@ -24,7 +24,7 @@ The MCP server also exposes important ICN context through the resources capabili
 - **Documentation**: Architecture and invariants docs with URIs like `icn://docs/architecture/overview.md`
 - **Policy Rules**: Access to policy configuration at `icn://policy/rules.json`
 - **CODEOWNERS**: Repository ownership information at `icn://CODEOWNERS`
-- **Logs**: Recent system logs at `icn://logs/recent` (placeholder)
+- **Logs**: Recent system logs at `icn://logs/recent`
 
 These resources allow GitHub Copilot to directly access and reference ICN documentation, policies, and configuration when providing assistance.
 
@@ -76,12 +76,18 @@ The MCP server supports configuration via environment variables:
 - `MCP_DB_PATH`: Override specific database file path (default: `{MCP_DB_DIR}/icn-mcp.sqlite`)
 - `MCP_MIGRATIONS_DIR`: Override migrations directory (default: `{REPO_ROOT}/db/migrations`)
 
+**Logs Configuration:**
+- `ICN_MCP_LOG_DIR`: Override log directory for recent logs resource (default: `{REPO_ROOT}/var/logs`)
+
 **Example .env configuration:**
 ```bash
 REPO_ROOT=/path/to/icn-mcp
 DOCS_ROOT=/path/to/icn-mcp/docs
 MCP_DB_DIR=/path/to/icn-mcp/var
 POLICY_RULES_PATH=/path/to/icn-mcp/mcp-server/policy.rules.json
+
+# Logs configuration
+ICN_MCP_LOG_DIR=/path/to/icn-mcp/var/logs
 
 # Consent system configuration
 ICN_CONSENT_REQUIRE_ALL=false
@@ -386,8 +392,9 @@ The ICN MCP server also exposes resources through the MCP resources capability, 
   - MIME Type: `text/plain`
 
 - **`icn://logs/recent`**: Recent system logs
-  - Content: Debugging information, task execution logs
+  - Content: Latest 10KB of log files from ICN_MCP_LOG_DIR (sanitized for security)
   - MIME Type: `text/plain`
+  - Features: Automatic secret redaction, sorted by modification time, size limits
 
 ### Using Resources
 
