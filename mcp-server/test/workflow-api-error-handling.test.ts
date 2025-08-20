@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { healthRoute, apiRoutes } from '@/api';
+import { registerWorkflowRoutes } from '@/workflow-api';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -17,8 +18,41 @@ describe('Workflow API Error Handling', () => {
     try { fs.rmSync(path.resolve(process.cwd(), 'branches'), { recursive: true, force: true }); } catch {/* noop */}
 
     app = Fastify({ logger: false });
+    
+    // Add global error handler to normalize validation errors (like in main server)
+    app.setErrorHandler((err: any, req, reply) => {
+      // Fastify validation error
+      if (err?.validation) {
+        return reply.status(400).send({
+          ok: false,
+          error: 'invalid_input',
+          message: 'Request failed schema validation',
+          issues: err.validation?.map((v: any) => ({
+            instancePath: v.instancePath,
+            message: v.message
+          })) ?? undefined
+        });
+      }
+      // Fallback
+      const status = err.statusCode || 500;
+      return reply.status(status).send({
+        ok: false,
+        error: status === 404 ? 'not_found' : 'internal_error',
+        message: err.message
+      });
+    });
+
     app.register(healthRoute);
     app.register(apiRoutes, { prefix: '/api' });
+    
+    // Mount workflow routes at /workflow prefix (like in main server)
+    app.register(registerWorkflowRoutes, { prefix: '/workflow' });
+    
+    // 404 normalization (like in main server)
+    app.setNotFoundHandler((req, reply) => {
+      reply.status(404).send({ ok: false, error: 'not_found', message: 'Not found' });
+    });
+    
     await app.ready();
 
     // Register a test agent to get auth token
