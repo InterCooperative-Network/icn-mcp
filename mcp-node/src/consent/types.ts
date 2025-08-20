@@ -32,6 +32,10 @@ export interface ConsentResponse {
   message?: string;
   /** Timestamp of decision */
   timestamp: string;
+  /** User who made the decision */
+  userId?: string;
+  /** Optional expiration timestamp */
+  expiresAt?: string;
 }
 
 export interface ProgressUpdate {
@@ -66,6 +70,12 @@ export interface ConsentConfiguration {
   consentTimeoutSeconds: number;
   /** Whether to log all consent decisions */
   logConsentDecisions: boolean;
+  /** Risk threshold for automatic consent requirement */
+  riskThreshold?: 'low' | 'medium' | 'high';
+  /** Default consent expiry in seconds */
+  defaultExpirySeconds?: number;
+  /** Storage path for consent decisions */
+  storagePath?: string;
 }
 
 export interface ToolDisplay {
@@ -83,4 +93,27 @@ export interface ToolDisplay {
   optionalParams: string[];
   /** Example usage */
   example?: string;
+}
+
+export interface PersistedConsentDecision {
+  /** Unique identifier */
+  id: string;
+  /** User who made the decision */
+  userId: string;
+  /** Tool name */
+  toolName: string;
+  /** Optional resource/context */
+  resource?: string;
+  /** Whether approved */
+  approved: boolean;
+  /** Optional user message */
+  message?: string;
+  /** Risk level at time of decision */
+  riskLevel: 'low' | 'medium' | 'high';
+  /** Unix timestamp when decision was made */
+  timestamp: number;
+  /** Optional expiration timestamp */
+  expiresAt?: number;
+  /** Created timestamp */
+  createdAt: number;
 }
