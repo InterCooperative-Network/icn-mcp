@@ -10,7 +10,8 @@ import { ConsentManager } from '../src/consent/manager.js';
 import { 
   persistConsentDecision, 
   checkPersistedConsent, 
-  resetDbInstance 
+  resetDbInstance,
+  deleteAllConsentsForUser
 } from '../src/consent/persistence.js';
 import { icnProcessConsent } from '../src/tools/icn_request_consent.js';
 
@@ -184,6 +185,9 @@ describe('Consent Persistence and Enforcement', () => {
     it('should get user consent history', () => {
       const manager = new ConsentManager();
       const userId = 'user123';
+      
+      // Clean up any existing data for this user
+      deleteAllConsentsForUser(userId);
       
       // Add multiple consent decisions
       const decisions = [

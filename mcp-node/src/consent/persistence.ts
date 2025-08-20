@@ -93,117 +93,141 @@ function toDomain(row: ConsentRow): PersistedConsentDecision {
     id: row.id,
     userId: row.user_id,
     toolName: row.tool_name,
-    resource: row.resource ?? undefined,
+    resource: row.resource ?? null,
     approved: row.approved === 1,
-    message: row.message ?? undefined,
+    message: row.message ?? null,
     riskLevel: row.risk_level,
     timestamp: row.timestamp,
-    expiresAt: row.expires_at ?? undefined,
+    expiresAt: row.expires_at,     // null when absent (never undefined)
     createdAt: row.created_at
   };
 }
 
-/**
- * Store a consent decision in the database
- */
+// Always normalize to NULL for "no resource"
+const normRes = (res?: string | null) => (res ?? null);
+
+// Return the *actual* row id (existing or newly inserted)
 export function persistConsentDecision(
   userId: string,
   toolName: string,
-  resource: string | undefined,
-  approved: boolean,
-  message: string | undefined,
-  riskLevel: 'low' | 'medium' | 'high',
-  expiresAt?: number
+  resource?: string | null,
+  approved?: boolean,
+  message?: string | null,
+  riskLevel?: 'low' | 'medium' | 'high',
+  expiresAt?: number | null
 ): PersistedConsentDecision {
   const db = getDb();
+  const r = normRes(resource);
   const now = Math.floor(Date.now() / 1000);
-  const normalizedResource = resource ?? null;
-  const id = nanoid();
-  
-  const stmt = db.prepare(`
-    INSERT INTO consent_decisions
-      (id, user_id, tool_name, resource, approved, message, risk_level, timestamp, expires_at, created_at)
-    VALUES
-      (?,  ?,       ?,         ?,        ?,        ?,       ?,          ?,         ?,          ?)
-    ON CONFLICT(user_id, tool_name, resource) DO UPDATE SET
-      approved=excluded.approved,
-      message=excluded.message,
-      risk_level=excluded.risk_level,
-      timestamp=excluded.timestamp,
-      expires_at=excluded.expires_at,
-      created_at=consent_decisions.created_at
-  `);
-  
-  stmt.run(
-    id,
-    userId,
-    toolName,
-    normalizedResource,
-    approved ? 1 : 0,
-    message ?? null,
-    riskLevel,
-    now,
-    expiresAt ?? null,
-    now
-  );
 
-  const decision: PersistedConsentDecision = {
-    id,
-    userId,
-    toolName,
-    resource: normalizedResource ?? undefined,
-    approved,
-    message,
-    riskLevel,
-    timestamp: now,
-    expiresAt,
-    createdAt: now
-  };
-  
-  return decision;
+  // See if a row already exists for (user, tool, resource)
+  const existing = db.prepare(`
+    SELECT * FROM consent_decisions
+    WHERE user_id = ? AND tool_name = ? AND resource IS ?
+    LIMIT 1
+  `).get(userId, toolName, r) as ConsentRow | undefined;
+
+  const id = existing?.id ?? nanoid();
+
+  if (existing) {
+    // Update existing record, but ensure timestamp changes
+    const updatedTimestamp = Math.max(now, existing.timestamp + 1);
+    db.prepare(`
+      UPDATE consent_decisions SET
+        approved = ?,
+        message = ?,
+        risk_level = ?,
+        timestamp = ?,
+        expires_at = ?
+      WHERE id = ?
+    `).run(
+      approved === undefined ? existing.approved : (approved ? 1 : 0),
+      message === undefined ? existing.message : (message ?? null),
+      riskLevel ?? existing.risk_level,
+      updatedTimestamp,
+      expiresAt === undefined ? existing.expires_at : (expiresAt ?? null),
+      id
+    );
+  } else {
+    // Insert new record
+    db.prepare(`
+      INSERT INTO consent_decisions
+        (id, user_id, tool_name, resource, approved, message, risk_level, timestamp, expires_at, created_at)
+      VALUES
+        (?,  ?,       ?,         ?,        ?,        ?,       ?,          ?,         ?,          ?)
+    `).run(
+      id,
+      userId,
+      toolName,
+      r,
+      approved ? 1 : 0,
+      message ?? null,
+      riskLevel ?? 'low',
+      now,
+      expiresAt ?? null,
+      now
+    );
+  }
+
+  // Return the updated/created record
+  const finalRow = db.prepare(`
+    SELECT * FROM consent_decisions WHERE id = ?
+  `).get(id) as ConsentRow;
+
+  return toDomain(finalRow);
 }
 
 export function checkPersistedConsent(
   userId: string,
   toolName: string,
-  resource?: string
+  resource?: string | null
 ): PersistedConsentDecision | null {
   const db = getDb();
-  const normalizedResource = resource ?? null;
+  const r = normRes(resource);
 
-  // Exact resource match first
+  // Exact match
   let row = db.prepare(`
     SELECT * FROM consent_decisions
     WHERE user_id = ? AND tool_name = ? AND resource IS ?
     LIMIT 1
-  `).get(userId, toolName, normalizedResource) as ConsentRow | undefined;
+  `).get(userId, toolName, r) as ConsentRow | undefined;
 
-  // Fallback to general consent (resource NULL)
-  if (!row && normalizedResource !== null) {
-    row = db.prepare(`
-      SELECT * FROM consent_decisions
-      WHERE user_id = ? AND tool_name = ? AND resource IS NULL
-      LIMIT 1
-    `).get(userId, toolName) as ConsentRow | undefined;
+  // Fallback to general (resource NULL) only if:
+  // 1. No exact match found
+  // 2. We're looking for a specific resource (r !== null)
+  // 3. There are NO other specific resource consents for this user/tool
+  if (!row && r !== null) {
+    const hasSpecificConsents = db.prepare(`
+      SELECT COUNT(*) as count FROM consent_decisions
+      WHERE user_id = ? AND tool_name = ? AND resource IS NOT NULL
+    `).get(userId, toolName) as { count: number };
+    
+    if (hasSpecificConsents.count === 0) {
+      // No specific resource consents exist, safe to fallback to general
+      row = db.prepare(`
+        SELECT * FROM consent_decisions
+        WHERE user_id = ? AND tool_name = ? AND resource IS NULL
+        LIMIT 1
+      `).get(userId, toolName) as ConsentRow | undefined;
+    }
   }
 
   if (!row) return null;
 
-  // Expiration gate here
+  // Honor expiration
   const now = Math.floor(Date.now() / 1000);
-  if (row.expires_at !== null && row.expires_at <= now) {
-    return null;
-  }
+  if (row.expires_at !== null && row.expires_at <= now) return null;
+
   return toDomain(row);
 }
 
 export function revokeConsent(
   userId: string,
   toolName: string,
-  resource?: string
+  resource?: string | null
 ): boolean {
   const db = getDb();
-  const normalizedResource = resource ?? null;
+  const r = normRes(resource);
   
   const stmt = db.prepare(`
     UPDATE consent_decisions 
@@ -212,21 +236,29 @@ export function revokeConsent(
   `);
   
   const now = Math.floor(Date.now() / 1000);
-  const result = stmt.run(now, userId, toolName, normalizedResource);
+  const result = stmt.run(now, userId, toolName, r);
   
   return result.changes > 0;
 }
 
+// Only latest per (tool, resource) for the user
 export function getUserConsentHistory(userId: string): PersistedConsentDecision[] {
   const db = getDb();
   
-  const stmt = db.prepare(`
-    SELECT * FROM consent_decisions 
-    WHERE user_id = ?
-    ORDER BY created_at DESC
-  `);
-  
-  const rows = stmt.all(userId) as ConsentRow[];
+  // Use a window function to get the latest record per (tool, resource) group
+  const rows = db.prepare(`
+    SELECT * FROM (
+      SELECT cd.*,
+             ROW_NUMBER() OVER (
+               PARTITION BY tool_name, IFNULL(resource, '') 
+               ORDER BY timestamp DESC, id DESC
+             ) as rn
+      FROM consent_decisions cd
+      WHERE cd.user_id = ?
+    )
+    WHERE rn = 1
+    ORDER BY timestamp DESC
+  `).all(userId) as ConsentRow[];
   
   return rows.map(toDomain);
 }
@@ -237,5 +269,12 @@ export function cleanupExpiredConsent(): number {
   
   const stmt = db.prepare(`DELETE FROM consent_decisions WHERE expires_at IS NOT NULL AND expires_at <= ?`);
   const result = stmt.run(now);
+  return result.changes;
+}
+
+export function deleteAllConsentsForUser(userId: string): number {
+  const db = getDb();
+  const stmt = db.prepare(`DELETE FROM consent_decisions WHERE user_id = ?`);
+  const result = stmt.run(userId);
   return result.changes;
 }

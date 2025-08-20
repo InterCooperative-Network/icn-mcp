@@ -67,14 +67,11 @@ export async function icnProcessConsent(args: {
   resource?: string;
   expiresAt?: string;
 }): Promise<ConsentResponse> {
-  const normalized = {
-    ...args,
-    message: args.approved ? (args.message ?? 'Approved') : (args.message ?? 'User denied request'),
-  };
+  const msg = args.approved ? (args.message ?? 'Approved') : 'User denied request';
 
   const response: ConsentResponse = {
-    approved: normalized.approved,
-    message: normalized.message,
+    approved: args.approved,
+    message: msg,
     timestamp: new Date().toISOString(),
     userId: args.userId,
     expiresAt: args.expiresAt

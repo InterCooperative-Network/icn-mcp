@@ -158,17 +158,16 @@ export class ConsentManager {
     return persistConsentDecision(
       userId,
       toolName,
-      resource,
+      resource ?? null,
       response.approved,
-      response.message,
+      response.message ?? null,
       riskLevel,
-      expiresAt
+      expiresAt ?? null
     );
   }
 
   revokeConsentDecision(userId: string, toolName: string, resource?: string): boolean {
-    const normalizedResource = resource ?? null;
-    return revokeConsent(userId, toolName, normalizedResource ?? undefined);
+    return revokeConsent(userId, toolName, resource ?? null);
   }
 
   /**

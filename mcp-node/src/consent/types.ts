@@ -103,17 +103,17 @@ export interface PersistedConsentDecision {
   /** Tool name */
   toolName: string;
   /** Optional resource/context */
-  resource?: string;
+  resource?: string | null;
   /** Whether approved */
   approved: boolean;
   /** Optional user message */
-  message?: string;
+  message?: string | null;
   /** Risk level at time of decision */
   riskLevel: 'low' | 'medium' | 'high';
   /** Unix timestamp when decision was made */
   timestamp: number;
   /** Optional expiration timestamp */
-  expiresAt?: number;
+  expiresAt?: number | null;
   /** Created timestamp */
   createdAt: number;
 }
