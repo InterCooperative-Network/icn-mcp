@@ -10,7 +10,6 @@ import { webhooksRoute } from './webhooks.js';
 import { buildTaskBrief } from '@/context';
 import { GITHUB_OWNER, GITHUB_REPO, GITHUB_DEFAULT_BRANCH } from '@/config';
 import { workersRoute } from './workers.js';
-import { registerWorkflowRoutes } from './workflow-api.js';
 
 export async function healthRoute(f: FastifyInstance) {
   f.get('/healthz', async () => ({ ok: true }));
@@ -236,8 +235,5 @@ export async function apiRoutes(f: FastifyInstance) {
 
   // Workers protocol
   await workersRoute(f);
-
-  // Workflow management endpoints
-  registerWorkflowRoutes(f);
 }
 

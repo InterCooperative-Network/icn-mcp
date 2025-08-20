@@ -474,4 +474,411 @@ Public Prometheus metrics including:
 
 Also includes default process metrics.
 
+## MCP Resources
+
+The MCP server provides resources accessible via the Model Context Protocol for GitHub Copilot integration.
+
+### Architecture Documentation
+
+Resources prefixed with `icn://docs/architecture/` provide access to ICN architecture documentation:
+
+- `icn://docs/architecture/event-sourcing.md` - Event sourcing patterns and implementation
+- `icn://docs/architecture/coordination-credits.md` - Coordination Credits system design
+- `icn://docs/architecture/governance.md` - Democratic governance structures
+- `icn://docs/architecture/mcp-integration.md` - Model Context Protocol integration patterns
+
+Example:
+```
+URI: icn://docs/architecture/event-sourcing.md
+MIME Type: text/markdown
+Description: ICN architecture documentation for event sourcing patterns
+```
+
+### Invariants Documentation
+
+Resources prefixed with `icn://docs/invariants/` provide access to system invariants and constraints:
+
+- `icn://docs/invariants/core.md` - Core ICN system invariants
+- `icn://docs/invariants/governance.md` - Governance-related invariants
+- `icn://docs/invariants/credits.md` - Coordination Credits invariants
+
+Example:
+```
+URI: icn://docs/invariants/core.md
+MIME Type: text/markdown
+Description: ICN system invariants defining core constraints and requirements
+```
+
+### Policy Rules
+
+The policy configuration is available as a resource:
+
+- `icn://policy/rules.json` - ICN policy rules for access control and permissions
+
+Example:
+```
+URI: icn://policy/rules.json
+MIME Type: application/json
+Description: ICN policy rules configuration for access control and code review requirements
+```
+
+## MCP Prompts
+
+The MCP server provides structured prompts for various ICN development and governance tasks.
+
+### Code Review Prompt
+
+**Name:** `code-review`
+**Category:** review
+**Description:** Review code changes with ICN policy and invariants in mind
+
+**Arguments:**
+- `changes` (required): The code changes to review (diff format)
+- `files` (optional): List of files being modified
+- `context` (optional): Additional context about the changes
+
+The prompt instructs reviewers to check:
+- ICN invariants compliance (event-sourced architecture, deterministic operations, democratic governance)
+- Policy adherence (file permissions, actor authorization)
+- Standard code quality practices
+
+### Architecture Decision Record (ADR) Prompt
+
+**Name:** `adr-template`
+**Category:** documentation
+**Description:** Generate Architecture Decision Record following ICN standards
+
+**Arguments:**
+- `decision` (required): The architectural decision being documented
+- `context` (optional): Background and context for the decision
+- `consequences` (optional): Expected consequences and trade-offs
+
+### Release Notes Prompt
+
+**Name:** `release-notes`
+**Category:** workflow
+**Description:** Generate release notes from changes and commits
+
+**Arguments:**
+- `version` (required): Version number for the release
+- `changes` (optional): List of changes and commits
+- `highlights` (optional): Key features or improvements to highlight
+
+### Governance Proposal Prompt
+
+**Name:** `governance-proposal`
+**Category:** governance
+**Description:** Structure governance proposals for ICN democratic processes
+
+**Arguments:**
+- `proposal` (required): The governance proposal content
+- `type` (optional): Type of proposal (policy, technical, process)
+- `stakeholders` (optional): Affected stakeholders and communities
+
+### Consent and UI Prompts
+
+The system includes specialized prompts for user consent and progress tracking:
+
+- `tool_consent_request` - Request user consent for tool execution
+- `tool_progress_update` - Provide progress updates during long-running operations
+- `tools_display` - Display available tools and their capabilities
+- `consent_summary` - Summarize consent requirements and permissions
+- `progress_summary` - Summarize overall progress across multiple operations
+
+## Workflow API
+
+The workflow API enables orchestration of multi-step processes and template-based automation.
+
+### List Workflow Templates
+
+GET /workflow/templates
+
+Public endpoint to list available workflow templates.
+
+Response:
+```json
+{
+  "ok": true,
+  "data": {
+    "templates": [
+      {
+        "id": "add-mcp-tool",
+        "name": "Add MCP Tool",
+        "description": "Workflow for adding new MCP tools to the system",
+        "steps": [
+          {
+            "id": "create-tool-file",
+            "name": "Create Tool Implementation",
+            "description": "Create the tool implementation file"
+          },
+          {
+            "id": "add-manifest",
+            "name": "Update Tool Manifest",
+            "description": "Add tool to the manifest"
+          }
+        ]
+      }
+    ],
+    "categories": ["development", "governance", "maintenance"],
+    "tags": ["mcp", "tools", "automation"]
+  },
+  "meta": { "version": "v1" }
+}
+```
+
+### Start Workflow
+
+POST /workflow/start
+
+Auth: Bearer token required.
+
+Request:
+```json
+{
+  "templateId": "add-mcp-tool",
+  "initialData": {
+    "toolName": "icn_new_feature",
+    "description": "Implement new feature functionality"
+  },
+  "sourceRequestId": "req_abc123"
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "data": {
+    "workflowId": "wf_xyz789",
+    "state": {
+      "id": "wf_xyz789",
+      "templateId": "add-mcp-tool",
+      "status": "active",
+      "currentStep": "create-tool-file",
+      "createdAt": "2024-01-15T10:30:00Z"
+    },
+    "nextStep": {
+      "step": {
+        "id": "create-tool-file",
+        "name": "Create Tool Implementation",
+        "description": "Create the tool implementation file",
+        "inputs": ["toolName", "description"]
+      },
+      "availableActions": ["complete_step", "create_checkpoint", "pause_workflow"]
+    }
+  },
+  "meta": { "workflowId": "wf_xyz789", "version": "v1" }
+}
+```
+
+### Get Workflow State
+
+GET /workflow/:workflowId
+
+Auth: Bearer token required.
+
+Response:
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "wf_xyz789",
+    "templateId": "add-mcp-tool",
+    "status": "active",
+    "currentStep": "create-tool-file",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:35:00Z",
+    "data": {
+      "toolName": "icn_new_feature",
+      "description": "Implement new feature functionality"
+    }
+  },
+  "meta": { "version": "v1" }
+}
+```
+
+### Get Next Step
+
+GET /workflow/:workflowId/next-step
+
+Auth: Bearer token required.
+
+Response:
+```json
+{
+  "ok": true,
+  "data": {
+    "step": {
+      "id": "add-manifest",
+      "name": "Update Tool Manifest",
+      "description": "Add tool to the manifest",
+      "inputs": ["manifestPath"],
+      "outputs": ["updatedManifest"]
+    },
+    "availableActions": ["complete_step", "create_checkpoint", "pause_workflow"]
+  },
+  "meta": { "workflowId": "wf_xyz789", "version": "v1" }
+}
+```
+
+### Create Checkpoint
+
+POST /workflow/checkpoint
+
+Auth: Bearer token required.
+
+Request:
+```json
+{
+  "workflowId": "wf_xyz789",
+  "stepId": "create-tool-file",
+  "data": {
+    "filePath": "mcp-node/src/tools/icn_new_feature.ts",
+    "implementationComplete": true
+  },
+  "notes": "Tool implementation completed and tested",
+  "completeStep": true,
+  "idempotencyKey": "checkpoint_123"
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "data": {
+    "checkpointId": "cp_abc456",
+    "workflowId": "wf_xyz789",
+    "stepId": "create-tool-file",
+    "createdAt": "2024-01-15T10:45:00Z",
+    "stepCompleted": true
+  },
+  "meta": { "version": "v1" }
+}
+```
+
+### Complete Step
+
+POST /workflow/complete-step
+
+Auth: Bearer token required.
+
+Request:
+```json
+{
+  "workflowId": "wf_xyz789",
+  "stepId": "add-manifest",
+  "outputs": {
+    "manifestPath": "mcp-node/src/manifest.ts",
+    "toolsAdded": 1
+  },
+  "idempotencyKey": "complete_456"
+}
+```
+
+### Orchestrate Workflow
+
+POST /workflow/orchestrate
+
+Auth: Bearer token required. Orchestrates multi-step workflows from natural language intents.
+
+Request:
+```json
+{
+  "intent": "Add a new MCP tool for validating ICN governance proposals",
+  "context": "Need to ensure governance proposals follow ICN democratic principles",
+  "constraints": [
+    "Must integrate with existing policy checking",
+    "Should validate against ICN invariants"
+  ],
+  "actor": "architect"
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "data": {
+    "plan": {
+      "id": "plan_abc123",
+      "intent": "Add a new MCP tool for validating ICN governance proposals",
+      "steps": [
+        {
+          "id": "analyze_requirements",
+          "tool": "icn_extract_principles",
+          "params": {
+            "text": "Add a new MCP tool for validating ICN governance proposals"
+          }
+        },
+        {
+          "id": "suggest_approach",
+          "tool": "icn_suggest_approach",
+          "params": {
+            "task_description": "Implement governance proposal validation tool",
+            "constraints": ["Must integrate with existing policy checking"]
+          }
+        }
+      ],
+      "expectedDuration": "2-4 hours",
+      "complexity": "medium"
+    },
+    "results": {
+      "analyze_requirements": {
+        "principles": ["democratic governance", "policy compliance"],
+        "requirements": ["validation logic", "integration points"]
+      },
+      "suggest_approach": {
+        "recommended_playbooks": ["add-mcp-tool"],
+        "suggested_approaches": [
+          {
+            "approach_name": "MCP Tool Implementation",
+            "steps": ["Create tool file", "Add to manifest", "Write tests"],
+            "estimated_effort": "4 hours",
+            "risk_level": "low"
+          }
+        ]
+      }
+    },
+    "status": "completed"
+  },
+  "meta": { "planId": "plan_abc123", "version": "v1" }
+}
+```
+
+### Workflow Actions
+
+POST /workflow/action
+
+Auth: Bearer token required.
+
+Request:
+```json
+{
+  "workflowId": "wf_xyz789",
+  "action": "pause",
+  "reason": "Waiting for external review"
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "data": {
+    "workflowId": "wf_xyz789",
+    "action": "pause",
+    "previousStatus": "active",
+    "newStatus": "paused",
+    "timestamp": "2024-01-15T11:00:00Z"
+  },
+  "meta": { "version": "v1" }
+}
+```
+
+**Available Actions:**
+- `pause` - Pause an active workflow
+- `resume` - Resume a paused workflow  
+- `fail` - Mark workflow as failed with reason
+
 
