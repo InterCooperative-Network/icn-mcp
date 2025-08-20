@@ -4,7 +4,7 @@ import { requireAuth } from './auth.js';
 import { checkPolicy } from './policy.js';
 import { 
   workflowsStartedTotal, 
-  // workflowsCompletedTotal, 
+  workflowsCompletedTotal, 
   workflowStepsTotal, 
   workflowCheckpointsTotal,
   workflowActiveGauge,
@@ -19,6 +19,9 @@ import {
   icnCheckpoint,
   // icnWorkflow, // TODO: Will be used when implementing full orchestration
   icnGetWorkflowState,
+  icnPauseWorkflow,
+  icnResumeWorkflow,
+  icnFailWorkflow,
   type AuthContext
 } from '../../mcp-node/src/tools/icn_workflow.js';
 
@@ -58,11 +61,14 @@ function sanitizeDeep(obj: any): any {
   return obj;
 }
 
-// Helper function to check if workflow exists (mock implementation)
-async function workflowExists(_workflowId: string): Promise<boolean> {
-  // TODO: Replace with actual workflow existence check when implementing real backend
-  // For now, return false to test 404 behavior - real implementation would check database
-  return false;
+// Helper function to check if workflow exists
+async function workflowExists(workflowId: string): Promise<boolean> {
+  try {
+    await icnGetWorkflowState({ workflowId });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Enhanced validation schemas with size limits
@@ -520,10 +526,6 @@ export async function registerWorkflowRoutes(f: FastifyInstance) {
       const body = WorkflowActionRequest.parse(req.body);
       const authContext = buildAuthContext(req);
       
-      // TODO: Use authContext when implementing actual workflow action MCP tools
-      // For now, we mark it as unused to satisfy linting
-      void authContext;
-      
       // Check if workflow exists
       if (!(await workflowExists(body.workflowId))) {
         return reply.code(404).send({ 
@@ -551,21 +553,72 @@ export async function registerWorkflowRoutes(f: FastifyInstance) {
         });
       }
 
-      // TODO: Call appropriate MCP tools for workflow actions
+      // Call appropriate MCP tool for workflow action
+      let result;
+      try {
+        switch (body.action) {
+          case 'pause':
+            result = await icnPauseWorkflow({
+              workflowId: body.workflowId,
+              action: body.action,
+              reason: body.reason,
+              authContext
+            });
+            // Update metrics: decrease active workflow count
+            workflowActiveGauge.dec({ template_id: 'unknown' });
+            break;
+          case 'resume':
+            result = await icnResumeWorkflow({
+              workflowId: body.workflowId,
+              action: body.action,
+              reason: body.reason,
+              authContext
+            });
+            // Update metrics: increase active workflow count
+            workflowActiveGauge.inc({ template_id: 'unknown' });
+            break;
+          case 'fail':
+            result = await icnFailWorkflow({
+              workflowId: body.workflowId,
+              action: body.action,
+              reason: body.reason,
+              authContext
+            });
+            // Update metrics: decrease active workflow count and increment completed count
+            workflowActiveGauge.dec({ template_id: 'unknown' });
+            workflowsCompletedTotal.inc({ template_id: 'unknown', status: 'failed' });
+            break;
+          default:
+            return reply.code(400).send({
+              error: 'invalid_action',
+              message: `Unsupported action: ${body.action}`
+            });
+        }
+      } catch (error: any) {
+        if (error.message.includes('Cannot pause workflow') || 
+            error.message.includes('Cannot resume workflow') || 
+            error.message.includes('already in failed state')) {
+          return reply.code(422).send({
+            error: 'invalid_state',
+            message: error.message,
+            workflowId: body.workflowId,
+            action: body.action
+          });
+        }
+        throw error; // Re-throw for general error handling
+      }
+
       f.log.info({ 
         workflowId: body.workflowId, 
         action: body.action,
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
         actor: req.agent!.name
-      }, 'workflow action requested');
+      }, 'workflow action completed successfully');
 
       return reply.header('Cache-Control', 'no-store').send({
         ok: true,
-        data: {
-          message: 'Workflow API ready - will integrate with MCP tools',
-          workflowId: body.workflowId,
-          action: body.action,
-          actor: req.agent!.name
-        },
+        data: result,
         meta: { 
           workflowId: body.workflowId,
           version: 'v1' 
