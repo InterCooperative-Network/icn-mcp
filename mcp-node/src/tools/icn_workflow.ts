@@ -99,6 +99,22 @@ export interface GetWorkflowStateParams {
   authContext?: AuthContext;
 }
 
+export interface WorkflowActionParams {
+  workflowId: string;
+  action: 'pause' | 'resume' | 'fail';
+  reason?: string;
+  authContext?: AuthContext;
+}
+
+export interface WorkflowActionResponse {
+  workflowId: string;
+  action: 'pause' | 'resume' | 'fail';
+  previousStatus: string;
+  newStatus: string;
+  timestamp: string;
+  reason?: string;
+}
+
 export interface OrchestrationParams {
   intent: string;
   context?: string;
@@ -300,6 +316,105 @@ export async function icnGetWorkflowState(params: GetWorkflowStateParams): Promi
   }
 
   return state;
+}
+
+/**
+ * Pause an active workflow
+ */
+export async function icnPauseWorkflow(params: WorkflowActionParams): Promise<WorkflowActionResponse> {
+  const { workflowId, authContext, reason } = params;
+  
+  // TODO: Use authContext for authorization checks
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _authContext = authContext;
+
+  const state = workflowEngine.getWorkflowState(workflowId);
+  if (!state) {
+    throw new Error(`Workflow not found: ${workflowId}`);
+  }
+
+  const previousStatus = state.status;
+  
+  if (previousStatus !== 'active') {
+    throw new Error(`Cannot pause workflow in ${previousStatus} state`);
+  }
+
+  await workflowEngine.pauseWorkflow(workflowId);
+  
+  return {
+    workflowId,
+    action: 'pause',
+    previousStatus,
+    newStatus: 'paused',
+    timestamp: new Date().toISOString(),
+    reason
+  };
+}
+
+/**
+ * Resume a paused workflow
+ */
+export async function icnResumeWorkflow(params: WorkflowActionParams): Promise<WorkflowActionResponse> {
+  const { workflowId, authContext, reason } = params;
+  
+  // TODO: Use authContext for authorization checks
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _authContext = authContext;
+
+  const state = workflowEngine.getWorkflowState(workflowId);
+  if (!state) {
+    throw new Error(`Workflow not found: ${workflowId}`);
+  }
+
+  const previousStatus = state.status;
+  
+  if (previousStatus !== 'paused') {
+    throw new Error(`Cannot resume workflow in ${previousStatus} state`);
+  }
+
+  await workflowEngine.resumeWorkflow(workflowId);
+  
+  return {
+    workflowId,
+    action: 'resume',
+    previousStatus,
+    newStatus: 'active',
+    timestamp: new Date().toISOString(),
+    reason
+  };
+}
+
+/**
+ * Fail a workflow with optional reason
+ */
+export async function icnFailWorkflow(params: WorkflowActionParams): Promise<WorkflowActionResponse> {
+  const { workflowId, authContext, reason } = params;
+  
+  // TODO: Use authContext for authorization checks
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _authContext = authContext;
+
+  const state = workflowEngine.getWorkflowState(workflowId);
+  if (!state) {
+    throw new Error(`Workflow not found: ${workflowId}`);
+  }
+
+  const previousStatus = state.status;
+  
+  if (previousStatus === 'failed') {
+    throw new Error(`Workflow is already in failed state`);
+  }
+
+  await workflowEngine.failWorkflow(workflowId, reason);
+  
+  return {
+    workflowId,
+    action: 'fail',
+    previousStatus,
+    newStatus: 'failed',
+    timestamp: new Date().toISOString(),
+    reason
+  };
 }
 
 /**

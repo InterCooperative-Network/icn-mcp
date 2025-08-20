@@ -1,10 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import crypto from 'node:crypto';
 import { requireAuth } from './auth.js';
 import { checkPolicy } from './policy.js';
 import { 
   workflowsStartedTotal, 
-  // workflowsCompletedTotal, 
+  workflowsCompletedTotal, 
   workflowStepsTotal, 
   workflowCheckpointsTotal,
   workflowActiveGauge,
@@ -19,6 +20,9 @@ import {
   icnCheckpoint,
   // icnWorkflow, // TODO: Will be used when implementing full orchestration
   icnGetWorkflowState,
+  icnPauseWorkflow,
+  icnResumeWorkflow,
+  icnFailWorkflow,
   type AuthContext
 } from '../../mcp-node/src/tools/icn_workflow.js';
 
@@ -58,11 +62,139 @@ function sanitizeDeep(obj: any): any {
   return obj;
 }
 
-// Helper function to check if workflow exists (mock implementation)
-async function workflowExists(_workflowId: string): Promise<boolean> {
-  // TODO: Replace with actual workflow existence check when implementing real backend
-  // For now, return false to test 404 behavior - real implementation would check database
-  return false;
+// Helper function to check if workflow exists and get its state
+async function getWorkflowStateHelper(workflowId: string): Promise<any | null> {
+  try {
+    return await icnGetWorkflowState({ workflowId });
+  } catch {
+    return null;
+  }
+}
+
+// Helper function to sanitize reason parameter
+function sanitizeReason(reason?: string): string | undefined {
+  if (!reason) return undefined;
+  
+  // Sanitize and limit to 1000 characters
+  let sanitized = sanitizeText(reason).slice(0, 1000);
+  
+  // Add ellipsis if truncated
+  if (reason.length > 1000) {
+    sanitized = sanitized.slice(0, 997) + '...';
+  }
+  
+  return sanitized;
+}
+
+// Define valid workflow state transitions
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  'active': ['paused', 'failed'],
+  'paused': ['active', 'failed'],
+  'failed': [], // terminal state
+  'completed': [] // terminal state
+};
+
+// Helper function to validate state transitions
+function validateTransition(fromStatus: string, toStatus: string): boolean {
+  return VALID_TRANSITIONS[fromStatus]?.includes(toStatus) ?? false;
+}
+
+// Helper function to handle workflow actions with idempotency and proper metrics
+async function executeWorkflowAction(
+  workflowId: string, 
+  action: 'pause' | 'resume' | 'fail', 
+  reason: string | undefined,
+  authContext: AuthContext,
+  currentState: any
+): Promise<{ result: any; idempotent: boolean }> {
+  const templateId = currentState.templateId || 'unassigned';
+  const currentStatus = currentState.status;
+  
+  // Log warning if templateId is missing to help fix upstream state
+  if (!currentState.templateId) {
+    console.warn(`Workflow ${workflowId} has no templateId in state, using 'unassigned' for metrics`);
+  }
+  
+  // Determine target status and check for idempotency
+  let targetStatus: string;
+  
+  switch (action) {
+    case 'pause':
+      targetStatus = 'paused';
+      if (currentStatus === 'paused') {
+        return {
+          result: {
+            workflowId,
+            action: 'pause',
+            previousStatus: currentStatus,
+            newStatus: currentStatus,
+            timestamp: new Date().toISOString(),
+            reason
+          },
+          idempotent: true
+        };
+      }
+      break;
+    case 'resume':
+      targetStatus = 'active';
+      if (currentStatus === 'active') {
+        return {
+          result: {
+            workflowId,
+            action: 'resume',
+            previousStatus: currentStatus,
+            newStatus: currentStatus,
+            timestamp: new Date().toISOString(),
+            reason
+          },
+          idempotent: true
+        };
+      }
+      break;
+    case 'fail':
+      targetStatus = 'failed';
+      if (currentStatus === 'failed') {
+        return {
+          result: {
+            workflowId,
+            action: 'fail',
+            previousStatus: currentStatus,
+            newStatus: currentStatus,
+            timestamp: new Date().toISOString(),
+            reason
+          },
+          idempotent: true
+        };
+      }
+      break;
+    default:
+      throw new Error(`Invalid action: ${action}`);
+  }
+  
+  // Validate transition
+  if (!validateTransition(currentStatus, targetStatus)) {
+    throw new Error(`Cannot ${action} workflow in ${currentStatus} state`);
+  }
+  
+  // Execute the action
+  let result;
+  switch (action) {
+    case 'pause':
+      result = await icnPauseWorkflow({ workflowId, action, reason, authContext });
+      workflowActiveGauge.dec({ template_id: templateId });
+      break;
+    case 'resume':
+      result = await icnResumeWorkflow({ workflowId, action, reason, authContext });
+      workflowActiveGauge.inc({ template_id: templateId });
+      break;
+    case 'fail':
+      result = await icnFailWorkflow({ workflowId, action, reason, authContext });
+      workflowActiveGauge.dec({ template_id: templateId });
+      workflowsCompletedTotal.inc({ template_id: templateId, status: 'failed' });
+      break;
+  }
+  
+  return { result, idempotent: false };
 }
 
 // Enhanced validation schemas with size limits
@@ -92,9 +224,14 @@ const CompleteStepRequest = z.object({
 
 const WorkflowActionRequest = z.object({
   workflowId: z.string().min(8).max(64).regex(/^[a-z0-9-]+$/),
-  action: z.enum(['pause', 'resume', 'fail']),
-  reason: z.string().max(500).optional()
-});
+  action: z.enum(['pause', 'resume', 'fail']).or(
+    z.string().transform((val) => val.toLowerCase()).pipe(z.enum(['pause', 'resume', 'fail']))
+  ),
+  reason: z.string().max(1000).optional()
+}).transform((data) => ({
+  ...data,
+  action: data.action.toLowerCase() as 'pause' | 'resume' | 'fail'
+}));
 
 const OrchestrationRequest = z.object({
   intent: z.string().min(1).max(2000),
@@ -115,33 +252,55 @@ function buildAuthContext(req: any): AuthContext {
 }
 
 // Helper function to handle workflow errors consistently
-function handleWorkflowError(error: any, reply: any, context: { workflowId?: string; stepId?: string } = {}) {
+function handleWorkflowError(error: any, reply: any, context: { workflowId?: string; stepId?: string; requestId?: string } = {}) {
   if (error.name === 'ZodError') {
     return reply.code(400).send({ 
-      error: 'invalid_input', 
-      issues: error.issues 
+      ok: false,
+      error: 'invalid_input',
+      message: 'Request failed schema validation', 
+      issues: error.issues,
+      ...(context.workflowId && { workflowId: context.workflowId }),
+      meta: context
     });
   }
   
   if (error.code === 'AUTH_REQUIRED') {
-    return reply.code(401).send({ error: 'auth_required' });
+    return reply.code(401).send({ 
+      ok: false,
+      error: 'auth_required',
+      message: 'Authentication required',
+      ...(context.workflowId && { workflowId: context.workflowId }),
+      meta: context
+    });
   }
   
   if (error.code === 'FORBIDDEN') {
-    return reply.code(403).send({ error: 'forbidden' });
+    return reply.code(403).send({ 
+      ok: false,
+      error: 'forbidden',
+      message: 'Access denied',
+      ...(context.workflowId && { workflowId: context.workflowId }),
+      meta: context
+    });
   }
   
   if (error.code === 'WORKFLOW_POLICY_VIOLATION') {
     return reply.code(422).send({ 
+      ok: false,
       error: 'policy_violation', 
-      detail: error.message 
+      message: error.message,
+      ...(context.workflowId && { workflowId: context.workflowId }),
+      meta: context
     });
   }
   
   if (error.message?.includes('not found')) {
     return reply.code(404).send({ 
-      error: 'not_found', 
-      ...context 
+      ok: false,
+      error: 'not_found',
+      message: error.message,
+      ...(context.workflowId && { workflowId: context.workflowId }),
+      meta: context
     });
   }
   
@@ -153,7 +312,13 @@ function handleWorkflowError(error: any, reply: any, context: { workflowId?: str
   };
   reply.log.error(logContext, 'workflow endpoint failed');
   
-  return reply.code(500).send({ error: 'internal_error' });
+  return reply.code(500).send({ 
+    ok: false,
+    error: 'internal_error',
+    message: 'An internal error occurred',
+    ...(context.workflowId && { workflowId: context.workflowId }),
+    meta: context
+  });
 }
 
 export async function registerWorkflowRoutes(f: FastifyInstance) {
@@ -516,21 +681,35 @@ export async function registerWorkflowRoutes(f: FastifyInstance) {
   f.post('/action', { 
     preHandler: requireAuth()
   }, async (req, reply) => {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    
     try {
       const body = WorkflowActionRequest.parse(req.body);
       const authContext = buildAuthContext(req);
       
-      // TODO: Use authContext when implementing actual workflow action MCP tools
-      // For now, we mark it as unused to satisfy linting
-      void authContext;
+      // Sanitize reason parameter
+      const sanitizedReason = sanitizeReason(body.reason);
       
-      // Check if workflow exists
-      if (!(await workflowExists(body.workflowId))) {
+      // Get workflow state (to determine if it exists and get templateId)
+      const currentState = await getWorkflowStateHelper(body.workflowId);
+      
+      // Return 404 before policy check to avoid leaking existence when unauthorized
+      if (!currentState) {
+        f.log.info({ 
+          requestId,
+          workflowId: body.workflowId,
+          action: body.action,
+          actor: req.agent!.name,
+          result: 'not_found'
+        }, 'workflow action attempt: workflow not found');
+        
         return reply.code(404).send({ 
           ok: false, 
           error: 'not_found', 
           message: 'Workflow not found',
-          workflowId: body.workflowId
+          workflowId: body.workflowId,
+          meta: { workflowId: body.workflowId, requestId }
         });
       }
       
@@ -542,37 +721,96 @@ export async function registerWorkflowRoutes(f: FastifyInstance) {
       
       if (!policyDecision.allow) {
         f.log.warn({ 
+          requestId,
+          workflowId: body.workflowId,
+          action: body.action,
           actor: req.agent!.name, 
-          reasons: policyDecision.reasons 
+          reasons: policyDecision.reasons,
+          result: 'forbidden'
         }, 'workflow action denied by policy');
+        
         return reply.code(403).send({ 
+          ok: false,
           error: 'forbidden', 
-          reasons: policyDecision.reasons 
+          message: 'Policy violation',
+          details: { reasons: policyDecision.reasons },
+          meta: { workflowId: body.workflowId, requestId }
         });
       }
 
-      // TODO: Call appropriate MCP tools for workflow actions
+      // Execute workflow action with idempotency and proper metrics
+      const { result, idempotent } = await executeWorkflowAction(
+        body.workflowId,
+        body.action,
+        sanitizedReason,
+        authContext,
+        currentState
+      );
+
+      // Audit log successful action
       f.log.info({ 
+        requestId,
         workflowId: body.workflowId, 
         action: body.action,
-        actor: req.agent!.name
-      }, 'workflow action requested');
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
+        idempotent,
+        actor: req.agent!.name,
+        templateId: currentState.templateId || 'unassigned',
+        duration: Date.now() - startTime,
+        result: 'success'
+      }, 'workflow action completed successfully');
 
       return reply.header('Cache-Control', 'no-store').send({
         ok: true,
-        data: {
-          message: 'Workflow API ready - will integrate with MCP tools',
-          workflowId: body.workflowId,
-          action: body.action,
-          actor: req.agent!.name
-        },
+        data: result,
         meta: { 
           workflowId: body.workflowId,
+          requestId,
+          idempotent,
           version: 'v1' 
         }
       });
+      
     } catch (error: any) {
-      return handleWorkflowError(error, reply, { workflowId: (req.body as any)?.workflowId });
+      // Audit log failed action
+      f.log.error({ 
+        requestId,
+        workflowId: (req.body as any)?.workflowId,
+        action: (req.body as any)?.action,
+        actor: req.agent?.name,
+        error: error.message,
+        duration: Date.now() - startTime,
+        result: 'error'
+      }, 'workflow action failed');
+      
+      // Handle specific transition errors with structured response
+      if (error.message.includes('Cannot pause workflow') || 
+          error.message.includes('Cannot resume workflow') || 
+          error.message.includes('Cannot fail workflow') ||
+          error.message.includes('already in failed state')) {
+        return reply.code(422).send({
+          ok: false,
+          error: 'invalid_transition',
+          message: error.message,
+          details: {
+            workflowId: (req.body as any)?.workflowId,
+            action: (req.body as any)?.action,
+            from: error.message.match(/in (\w+) state/)?.[1] || 'unknown',
+            to: (req.body as any)?.action === 'pause' ? 'paused' : 
+                (req.body as any)?.action === 'resume' ? 'active' : 'failed'
+          },
+          meta: { 
+            workflowId: (req.body as any)?.workflowId,
+            requestId 
+          }
+        });
+      }
+      
+      return handleWorkflowError(error, reply, { 
+        workflowId: (req.body as any)?.workflowId,
+        requestId 
+      });
     }
   });
 }
