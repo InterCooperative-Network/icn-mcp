@@ -184,7 +184,7 @@ export class ConsentManager {
   /**
    * Check if a tool requires consent based on risk threshold and configuration
    */
-  requiresConsentForUser(toolName: string, userId?: string, resource?: string): boolean {
+  requiresConsentForUser(toolName: string, _userId?: string, _resource?: string): boolean {
     // Apply regular consent rules first
     if (this.config.neverRequireConsent.includes(toolName)) {
       return false;

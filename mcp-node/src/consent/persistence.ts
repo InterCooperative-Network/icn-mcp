@@ -52,7 +52,7 @@ function getDb(): Database.Database {
     dbInstance.prepare('CREATE INDEX IF NOT EXISTS idx_consent_decisions_tool ON consent_decisions(tool_name)').run();
     dbInstance.prepare('CREATE INDEX IF NOT EXISTS idx_consent_decisions_user ON consent_decisions(user_id)').run();
     dbInstance.prepare('CREATE INDEX IF NOT EXISTS idx_consent_decisions_expires ON consent_decisions(expires_at)').run();
-  } catch (error) {
+  } catch {
     // Ignore errors if table already exists or if running in main server context
   }
   
@@ -66,7 +66,7 @@ export function resetDbInstance(): void {
   if (dbInstance) {
     try {
       dbInstance.close();
-    } catch (error) {
+    } catch {
       // Ignore close errors
     }
     dbInstance = null;

@@ -10,9 +10,6 @@ import { ConsentManager } from '../src/consent/manager.js';
 import { 
   persistConsentDecision, 
   checkPersistedConsent, 
-  revokeConsent, 
-  getUserConsentHistory,
-  cleanupExpiredConsent,
   resetDbInstance 
 } from '../src/consent/persistence.js';
 import { icnProcessConsent } from '../src/tools/icn_request_consent.js';
