@@ -331,6 +331,83 @@ describe('Resources and Prompts HTTP API', () => {
 
       await app.close();
     });
+
+    it('should read docs/invariants if available', async () => {
+      const app = Fastify({ logger: false });
+      app.register(healthRoute);
+      app.register(apiRoutes, { prefix: '/api' });
+      app.register(resourcesPromptsRoutes, { prefix: '/api' });
+      await app.ready();
+
+      // Register agent to get token
+      const regRes = await app.inject({
+        method: 'POST',
+        url: '/api/agent/register',
+        payload: { name: 'Test Agent', kind: 'planner' }
+      });
+      const { token } = regRes.json() as any;
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/resources/icn://docs/invariants/catalog.md',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = response.json() as any;
+      expect(data.ok).toBe(true);
+      expect(data.data.contents[0].uri).toBe('icn://docs/invariants/catalog.md');
+      expect(data.data.contents[0].mimeType).toBe('text/markdown');
+      expect(typeof data.data.contents[0].text).toBe('string');
+
+      await app.close();
+    });
+
+    it('should read architecture docs if available', async () => {
+      const app = Fastify({ logger: false });
+      app.register(healthRoute);
+      app.register(apiRoutes, { prefix: '/api' });
+      app.register(resourcesPromptsRoutes, { prefix: '/api' });
+      await app.ready();
+
+      // Register agent to get token
+      const regRes = await app.inject({
+        method: 'POST',
+        url: '/api/agent/register',
+        payload: { name: 'Test Agent', kind: 'planner' }
+      });
+      const { token } = regRes.json() as any;
+
+      // First get list of resources to find an architecture doc
+      const listResponse = await app.inject({
+        method: 'GET',
+        url: '/api/resources',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      expect(listResponse.statusCode).toBe(200);
+      const listData = listResponse.json() as any;
+      
+      // Find an architecture doc if available
+      const archDoc = listData.data.resources.find((r: any) => r.uri.startsWith('icn://docs/architecture/'));
+      
+      if (archDoc) {
+        const response = await app.inject({
+          method: 'GET',
+          url: `/api/resources/${archDoc.uri}`,
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const data = response.json() as any;
+        expect(data.ok).toBe(true);
+        expect(data.data.contents[0].uri).toBe(archDoc.uri);
+        expect(data.data.contents[0].mimeType).toBe('text/markdown');
+        expect(typeof data.data.contents[0].text).toBe('string');
+      }
+
+      await app.close();
+    });
   });
 
   describe('Error handling', () => {
