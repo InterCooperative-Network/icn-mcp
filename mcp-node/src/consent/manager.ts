@@ -3,8 +3,15 @@
  * Handles user consent requests and configuration
  */
 
-import { ConsentRequest, ConsentResponse, ConsentConfiguration, ProgressUpdate, ToolDisplay } from './types.js';
+import { ConsentRequest, ConsentResponse, ConsentConfiguration, ProgressUpdate, ToolDisplay, PersistedConsentDecision } from './types.js';
 import { generateToolManifest } from '../manifest.js';
+import { 
+  persistConsentDecision, 
+  checkPersistedConsent, 
+  revokeConsent, 
+  getUserConsentHistory,
+  cleanupExpiredConsent 
+} from './persistence.js';
 
 export class ConsentManager {
   private config: ConsentConfiguration;
@@ -25,7 +32,6 @@ export class ConsentManager {
       neverRequireConsent: [
         'icn_get_architecture',
         'icn_get_invariants',
-        'icn_check_policy',
         'icn_get_task_context'
       ],
       consentTimeoutSeconds: 300, // 5 minutes
@@ -118,6 +124,101 @@ export class ConsentManager {
   }
 
   /**
+   * Check if consent has been granted for a tool and user
+   */
+  checkConsent(userId: string, toolName: string, resource?: string): PersistedConsentDecision | null {
+    // Check persisted consent first
+    const persistedConsent = checkPersistedConsent(userId, toolName, resource);
+    if (persistedConsent) {
+      return persistedConsent;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Persist a consent decision to the database
+   */
+  persistConsent(
+    userId: string,
+    toolName: string,
+    resource: string | undefined,
+    response: ConsentResponse,
+    riskLevel: 'low' | 'medium' | 'high'
+  ): PersistedConsentDecision {
+    // Calculate expiration if default is set
+    let expiresAt: number | undefined;
+    if (this.config.defaultExpirySeconds) {
+      expiresAt = Math.floor(Date.now() / 1000) + this.config.defaultExpirySeconds;
+    }
+    if (response.expiresAt) {
+      expiresAt = Math.floor(new Date(response.expiresAt).getTime() / 1000);
+    }
+
+    return persistConsentDecision(
+      userId,
+      toolName,
+      resource ?? null,
+      response.approved,
+      response.message ?? null,
+      riskLevel,
+      expiresAt ?? null
+    );
+  }
+
+  revokeConsentDecision(userId: string, toolName: string, resource?: string): boolean {
+    return revokeConsent(userId, toolName, resource ?? null);
+  }
+
+  /**
+   * Get consent history for a user
+   */
+  getConsentHistory(userId: string): PersistedConsentDecision[] {
+    return getUserConsentHistory(userId);
+  }
+
+  /**
+   * Check if a tool requires consent based on risk threshold and configuration
+   */
+  requiresConsentForUser(toolName: string, _userId?: string, _resource?: string): boolean {
+    // Apply environment override first
+    if (this.config.requireConsentForAll) {
+      return true;
+    }
+    
+    // Check never require list
+    if (this.config.neverRequireConsent.includes(toolName)) {
+      return false;
+    }
+    
+    // Check always require list
+    if (this.config.alwaysRequireConsent.includes(toolName)) {
+      return true;
+    }
+
+    // Check risk threshold
+    if (this.config.riskThreshold) {
+      const riskLevel = this.assessRiskLevel(toolName, {});
+      const riskLevels: Array<'low' | 'medium' | 'high'> = ['low', 'medium', 'high'];
+      const toolRiskIndex = riskLevels.indexOf(riskLevel);
+      const thresholdIndex = riskLevels.indexOf(this.config.riskThreshold);
+      
+      if (toolRiskIndex >= thresholdIndex) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Clean up expired consents
+   */
+  cleanupExpiredConsents(): number {
+    return cleanupExpiredConsent();
+  }
+
+  /**
    * Get all available tools formatted for display
    */
   getToolsDisplay(): ToolDisplay[] {
@@ -170,6 +271,36 @@ export class ConsentManager {
     this.config = { ...this.config, ...updates };
   }
 
+  // Public helper methods
+
+  /**
+   * Assess risk level for a tool
+   */
+  assessRiskLevel(toolName: string, _args: any): 'low' | 'medium' | 'high' {
+    // Risk Level Definitions:
+    // Low Risk: Read-only operations, no mutations, no external dependencies
+    // Medium Risk: Evaluations, validations, simulations (no persistent writes)
+    // High Risk: File I/O, network calls, persistent state changes
+    
+    // High risk tools that modify files or run commands
+    if (toolName.includes('write') || toolName.includes('patch') || 
+        toolName.includes('run') || toolName.includes('generate_pr') ||
+        toolName.includes('create') || toolName.includes('delete') ||
+        toolName.includes('modify') || toolName.includes('upload')) {
+      return 'high';
+    }
+    
+    // Medium risk tools that check policies, validate, or simulate
+    if (toolName.includes('check') || toolName.includes('workflow') ||
+        toolName.includes('orchestrate') || toolName.includes('validate') ||
+        toolName.includes('simulate') || toolName.includes('analyze')) {
+      return 'medium';
+    }
+    
+    // Low risk tools that only read data
+    return 'low';
+  }
+
   // Private helper methods
 
   /**
@@ -212,6 +343,27 @@ export class ConsentManager {
       envConfig.logConsentDecisions = false;
     }
     
+    // ICN_CONSENT_RISK_THRESHOLD: Risk threshold for automatic consent requirement
+    if (process.env.ICN_CONSENT_RISK_THRESHOLD) {
+      const threshold = process.env.ICN_CONSENT_RISK_THRESHOLD.toLowerCase();
+      if (['low', 'medium', 'high'].includes(threshold)) {
+        envConfig.riskThreshold = threshold as 'low' | 'medium' | 'high';
+      }
+    }
+    
+    // ICN_CONSENT_DEFAULT_EXPIRY: Default consent expiry in seconds
+    if (process.env.ICN_CONSENT_DEFAULT_EXPIRY) {
+      const expiry = parseInt(process.env.ICN_CONSENT_DEFAULT_EXPIRY, 10);
+      if (!isNaN(expiry) && expiry > 0) {
+        envConfig.defaultExpirySeconds = expiry;
+      }
+    }
+    
+    // ICN_CONSENT_STORAGE_PATH: Storage path for consent decisions
+    if (process.env.ICN_CONSENT_STORAGE_PATH) {
+      envConfig.storagePath = process.env.ICN_CONSENT_STORAGE_PATH;
+    }
+    
     return envConfig;
   }
 
@@ -221,31 +373,6 @@ export class ConsentManager {
       name: toolName, 
       description: 'Unknown tool' 
     };
-  }
-
-  private assessRiskLevel(toolName: string, _args: any): 'low' | 'medium' | 'high' {
-    // Risk Level Definitions:
-    // Low Risk: Read-only operations, no mutations, no external dependencies
-    // Medium Risk: Evaluations, validations, simulations (no persistent writes)
-    // High Risk: File I/O, network calls, persistent state changes
-    
-    // High risk tools that modify files or run commands
-    if (toolName.includes('write') || toolName.includes('patch') || 
-        toolName.includes('run') || toolName.includes('generate_pr') ||
-        toolName.includes('create') || toolName.includes('delete') ||
-        toolName.includes('modify') || toolName.includes('upload')) {
-      return 'high';
-    }
-    
-    // Medium risk tools that check policies, validate, or simulate
-    if (toolName.includes('check') || toolName.includes('workflow') ||
-        toolName.includes('orchestrate') || toolName.includes('validate') ||
-        toolName.includes('simulate') || toolName.includes('analyze')) {
-      return 'medium';
-    }
-    
-    // Low risk tools that only read data
-    return 'low';
   }
 
   private estimateExecutionTime(toolName: string): string {

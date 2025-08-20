@@ -58,24 +58,45 @@ export async function icnRequestConsent(args: RequestConsentArgs): Promise<Reque
   };
 }
 
-/**
- * Process user consent response
- */
 export async function icnProcessConsent(args: {
   requestId: string;
   approved: boolean;
   message?: string;
+  userId?: string;
+  toolName?: string;
+  resource?: string;
+  expiresAt?: string;
 }): Promise<ConsentResponse> {
+  const msg = args.approved ? (args.message ?? 'Approved') : 'User denied request';
+
   const response: ConsentResponse = {
     approved: args.approved,
-    message: args.message,
-    timestamp: new Date().toISOString()
+    message: msg,
+    timestamp: new Date().toISOString(),
+    userId: args.userId,
+    expiresAt: args.expiresAt
   };
   
-  // In a real implementation, you would:
-  // 1. Look up the original request by requestId
-  // 2. Log the consent decision
-  // 3. Proceed with or cancel the tool execution
+  // Persist the decision if we have enough information
+  if (args.userId && args.toolName) {
+    const consentManager = new ConsentManager();
+    const riskLevel = consentManager.assessRiskLevel(args.toolName, {});
+    
+    try {
+      const persistedDecision = consentManager.persistConsent(
+        args.userId,
+        args.toolName,
+        args.resource ?? undefined,
+        response,
+        riskLevel
+      );
+      
+      console.log(`[CONSENT] Persisted decision for ${args.userId}/${args.toolName}: ${args.approved ? 'APPROVED' : 'DENIED'}`);
+      console.log(`[CONSENT] Decision ID: ${persistedDecision.id}`);
+    } catch (error) {
+      console.error(`[CONSENT] Failed to persist decision:`, error);
+    }
+  }
   
   console.log(`[CONSENT] Request ${args.requestId}: ${args.approved ? 'APPROVED' : 'DENIED'}`);
   
