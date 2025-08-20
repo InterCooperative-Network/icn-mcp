@@ -17,6 +17,12 @@ ICN MCP Agent HQ is a TypeScript monorepo that orchestrates AI agents for ICN de
 
 **NEVER CANCEL any build or test command** - All operations complete quickly but use appropriate timeouts to be safe.
 
+**Timing Reference:** Benchmarks recorded on 12-core desktop with SSD on Node 20, cold cache:
+- `npm ci`: 15-25 seconds  
+- `npm run build`: 7-12 seconds
+- `npm test`: 10-18 seconds  
+- Individual workspace ops: 1-5 seconds
+
 **Setup and Dependencies:**
 ```bash
 # Ensure Node.js v20 is installed (required - see .nvmrc)
@@ -239,6 +245,24 @@ When the MCP server is running, these tools are available to GitHub Copilot:
 
 ### Agent Issues
 - **"Agent registration fails with 401"**: This is expected when agents already exist in the database. Agent registration uses bootstrap auth (no token required) only when no agents exist. With existing agents, use valid Bearer tokens.
+
+**Bootstrap mode (no agents exist):**
+```bash
+curl -i -X POST http://localhost:8787/agents \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"ci-agent"}'
+# Expected: 201 Created
+```
+
+**Normal mode (agents exist, Bearer required):**
+```bash
+curl -i -X POST http://localhost:8787/agents \
+  -H "Authorization: Bearer $AGENT_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"ci-agent"}'
+# Expected: 201 Created (with valid token) or 401 Unauthorized (invalid/missing token)
+```
+
 - **"Task file missing"**: Agents may expect `tasks from Intent-0001` file
 - **"Permission errors"**: Check file permissions and paths
 - **"Agent crashes"**: Run with `node --inspect` for debugging

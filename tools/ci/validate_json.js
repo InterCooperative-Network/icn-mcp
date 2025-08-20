@@ -3,63 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { glob } from 'glob';
-
-/**
- * Strip comments from JSON-like content to validate structure
- */
-function stripJsonComments(content) {
-  // Remove single-line comments (but not URLs)
-  content = content.replace(/(?<!:)\/\/.*$/gm, '');
-  // Remove multi-line comments (but be careful about strings containing /*)
-  // Only match /* that are not inside strings
-  let result = '';
-  let inString = false;
-  let inComment = false;
-  let escape = false;
-  
-  for (let i = 0; i < content.length; i++) {
-    const char = content[i];
-    const nextChar = content[i + 1];
-    
-    if (escape) {
-      escape = false;
-      if (!inComment) result += char;
-      continue;
-    }
-    
-    if (char === '\\' && inString) {
-      escape = true;
-      if (!inComment) result += char;
-      continue;
-    }
-    
-    if (char === '"' && !inComment) {
-      inString = !inString;
-      result += char;
-      continue;
-    }
-    
-    if (!inString) {
-      if (char === '/' && nextChar === '*' && !inComment) {
-        inComment = true;
-        i++; // skip the *
-        continue;
-      }
-      
-      if (char === '*' && nextChar === '/' && inComment) {
-        inComment = false;
-        i++; // skip the /
-        continue;
-      }
-    }
-    
-    if (!inComment) {
-      result += char;
-    }
-  }
-  
-  return result;
-}
+import stripJsonComments from 'strip-json-comments';
 
 /**
  * Validate JSON files in the repository

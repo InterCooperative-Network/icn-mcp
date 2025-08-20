@@ -1,0 +1,19 @@
+{
+  // This is a test TypeScript config with comments
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"], // Path mapping that was causing issues
+      "@utils/*": ["utils/*"]
+    },
+    "proxy": "http://localhost:3000", // URL in string
+    "pattern": "foo\\\"bar", // Escaped quotes
+    "description": "not /* a comment */", // Block comment tokens in string
+    /* This is a block comment */
+    "lib": ["ES2021"]
+  },
+  /* Another 
+     multiline
+     comment */
+  "include": ["src/**/*.ts"]
+}
