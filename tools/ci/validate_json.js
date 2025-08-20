@@ -3,17 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { glob } from 'glob';
-
-/**
- * Strip comments from JSON-like content to validate structure
- */
-function stripJsonComments(content) {
-  // Remove single-line comments
-  content = content.replace(/\/\/.*$/gm, '');
-  // Remove multi-line comments
-  content = content.replace(/\/\*[\s\S]*?\*\//g, '');
-  return content;
-}
+import stripJsonComments from 'strip-json-comments';
 
 /**
  * Validate JSON files in the repository
