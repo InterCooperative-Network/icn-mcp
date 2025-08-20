@@ -292,3 +292,214 @@ describe('icnGeneratePRPatch', () => {
     }
   });
 });
+
+describe('Zod Input Validation Tests', () => {
+  describe('icnWritePatch validation', () => {
+    it('should reject empty file path', async () => {
+      await expect(icnWritePatch({
+        filePath: '',
+        content: 'test'
+      })).rejects.toThrow(); // Just check that it throws any error
+    });
+
+    it('should reject missing required fields', async () => {
+      await expect(icnWritePatch({
+        filePath: 'test.txt'
+      } as any)).rejects.toThrow();
+    });
+
+    it('should accept valid input with all optional fields', async () => {
+      const testFile = path.join(testDir, 'validation-test.txt');
+      const result = await icnWritePatch({
+        filePath: testFile,
+        content: 'test content',
+        createIfNotExists: true,
+        actor: 'test-actor',
+        description: 'test description'
+      });
+      
+      expect(result).toHaveProperty('success');
+      expect(result).toHaveProperty('policyCheck');
+    });
+  });
+
+  describe('icnRunTests validation', () => {
+    it('should reject invalid test type', async () => {
+      await expect(icnRunTests({
+        testType: 'invalid' as any,
+        testCommand: 'echo test'
+      })).rejects.toThrow();
+    });
+
+    it('should reject negative timeout', async () => {
+      await expect(icnRunTests({
+        timeout: -100,
+        testCommand: 'echo test'
+      })).rejects.toThrow();
+    });
+
+    it('should reject timeout over limit', async () => {
+      await expect(icnRunTests({
+        timeout: 700000, // Over 600000 limit
+        testCommand: 'echo test'
+      })).rejects.toThrow();
+    });
+
+    it('should accept valid input with all fields', async () => {
+      const result = await icnRunTests({
+        testType: 'npm',
+        testCommand: 'echo "test passed"',
+        workspace: 'test-workspace',
+        testFile: 'test.spec.ts',
+        timeout: 5000
+      });
+      
+      expect(result).toHaveProperty('success');
+      expect(result).toHaveProperty('result');
+    }, 10000);
+  });
+
+  describe('icnRunLinters validation', () => {
+    it('should reject invalid linter type', async () => {
+      await expect(icnRunLinters({
+        linterType: 'invalid' as any
+      })).rejects.toThrow();
+    });
+
+    it('should accept valid linter types', async () => {
+      const validTypes = ['eslint', 'prettier', 'tsc', 'custom'];
+      
+      for (const linterType of validTypes) {
+        const result = await icnRunLinters({
+          linterType: linterType as any,
+          linterCommand: 'echo "no issues"',
+          timeout: 5000
+        });
+        
+        expect(result).toHaveProperty('success');
+        expect(result).toHaveProperty('result');
+      }
+    }, 20000);
+  });
+
+  describe('icnGeneratePRPatch validation', () => {
+    it('should reject empty title', async () => {
+      await expect(icnGeneratePRPatch({
+        title: '',
+        description: 'test description'
+      })).rejects.toThrow();
+    });
+
+    it('should reject empty description', async () => {
+      await expect(icnGeneratePRPatch({
+        title: 'test title',
+        description: ''
+      })).rejects.toThrow();
+    });
+
+    it('should accept minimal valid input', async () => {
+      const result = await icnGeneratePRPatch({
+        title: 'Valid Title',
+        description: 'Valid description',
+        changedFiles: ['test.ts']
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.prDescriptor.title).toBe('Valid Title');
+    });
+  });
+
+  describe('icnExplainTestFailures validation', () => {
+    it('should reject empty test output', async () => {
+      await expect(icnExplainTestFailures({
+        testOutput: ''
+      })).rejects.toThrow();
+    });
+
+    it('should reject invalid test type', async () => {
+      await expect(icnExplainTestFailures({
+        testOutput: 'test output',
+        testType: 'invalid' as any
+      })).rejects.toThrow();
+    });
+
+    it('should accept valid test types', async () => {
+      const validTypes = ['npm', 'vitest', 'jest', 'cargo', 'mocha', 'custom'];
+      
+      for (const testType of validTypes) {
+        const result = await icnExplainTestFailures({
+          testOutput: 'some test output with failures',
+          testType: testType as any
+        });
+        
+        expect(result).toHaveProperty('totalFailures');
+        expect(result).toHaveProperty('analyses');
+      }
+    });
+  });
+});
+
+describe('Enhanced Error Handling Tests', () => {
+  describe('icnWritePatch error scenarios', () => {
+    it('should prevent writing to dangerous paths', async () => {
+      await expect(icnWritePatch({
+        filePath: '.git/config',
+        content: 'malicious content',
+        createIfNotExists: true
+      })).rejects.toThrow('not allowed for security reasons');
+    });
+
+    it('should prevent writing to node_modules', async () => {
+      await expect(icnWritePatch({
+        filePath: 'node_modules/package/index.js',
+        content: 'malicious content',
+        createIfNotExists: true
+      })).rejects.toThrow('not allowed for security reasons');
+    });
+
+    it('should prevent writing outside repo boundaries', async () => {
+      await expect(icnWritePatch({
+        filePath: '../../../etc/passwd',
+        content: 'malicious content',
+        createIfNotExists: true
+      })).rejects.toThrow('within repository boundaries');
+    });
+  });
+
+  describe('icnRunTests error scenarios', () => {
+    it('should handle command execution failure', async () => {
+      const result = await icnRunTests({
+        testCommand: 'nonexistent-command-that-will-fail',
+        timeout: 3000
+      });
+      
+      expect(result.success).toBe(false);
+      expect(result.result.failures).toHaveLength(1);
+      expect(result.result.failures[0].testName).toBe('Command execution');
+    }, 5000);
+
+    it('should handle timeout properly', async () => {
+      const result = await icnRunTests({
+        testCommand: 'sleep 10',
+        timeout: 1000
+      });
+      
+      expect(result.success).toBe(false);
+      // Command should be killed due to timeout
+    }, 3000);
+  });
+
+  describe('icnGeneratePRPatch error scenarios', () => {
+    it('should handle missing git gracefully', async () => {
+      // Test with no changed files provided, should handle git failure gracefully
+      const result = await icnGeneratePRPatch({
+        title: 'Test with no git',
+        description: 'Testing git failure handling'
+        // No changedFiles provided, will try git
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.prDescriptor.files).toEqual([]);
+    });
+  });
+});

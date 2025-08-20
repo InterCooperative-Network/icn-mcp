@@ -1,17 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { z } from 'zod';
 import { icnCheckPolicy, PolicyCheckRequest } from './icn_check_policy.js';
 
-export interface GeneratePRPatchRequest {
-  title: string;
-  description: string;
-  changedFiles?: string[];
-  baseBranch?: string;
-  targetBranch?: string;
-  actor?: string;
-  createGitHubPR?: boolean;
-}
+export const GeneratePRPatchRequestSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().min(1, 'Description is required'),
+  changedFiles: z.array(z.string()).optional(),
+  baseBranch: z.string().optional(),
+  targetBranch: z.string().optional(),
+  actor: z.string().optional(),
+  createGitHubPR: z.boolean().optional()
+}).strict();
+
+export type GeneratePRPatchRequest = z.infer<typeof GeneratePRPatchRequestSchema>;
 
 export interface PRPatchFile {
   path: string;
@@ -187,6 +190,16 @@ function generateArtifactPath(title: string): string {
 }
 
 export async function icnGeneratePRPatch(request: GeneratePRPatchRequest): Promise<GeneratePRPatchResponse> {
+  // Validate input
+  try {
+    GeneratePRPatchRequestSchema.parse(request);
+  } catch (error: any) {
+    if (error?.errors) {
+      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+    }
+    throw error;
+  }
+
   const repoRoot = getRepoRoot();
   const baseBranch = request.baseBranch || 'main';
   const targetBranch = request.targetBranch || 'HEAD';

@@ -1,16 +1,19 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 import { STDOUT_TRUNCATE_LIMIT, STDERR_TRUNCATE_LIMIT } from './constants.js';
 
-export interface RunLintersRequest {
-  linterType?: 'eslint' | 'prettier' | 'tsc' | 'custom';
-  linterCommand?: string;
-  workspace?: string;
-  files?: string[];
-  fix?: boolean;
-  timeout?: number;
-}
+export const RunLintersRequestSchema = z.object({
+  linterType: z.enum(['eslint', 'prettier', 'tsc', 'custom']).optional(),
+  linterCommand: z.string().optional(),
+  workspace: z.string().optional(),
+  files: z.array(z.string()).optional(),
+  fix: z.boolean().optional(),
+  timeout: z.number().int().positive().max(300000).optional()
+}).strict();
+
+export type RunLintersRequest = z.infer<typeof RunLintersRequestSchema>;
 
 export interface LintIssue {
   file: string;
@@ -187,6 +190,16 @@ function buildLintCommand(request: RunLintersRequest): string[] {
 }
 
 export async function icnRunLinters(request: RunLintersRequest): Promise<RunLintersResponse> {
+  // Validate input
+  try {
+    RunLintersRequestSchema.parse(request);
+  } catch (error: any) {
+    if (error?.errors) {
+      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+    }
+    throw error;
+  }
+
   const repoRoot = getRepoRoot();
   const command = buildLintCommand(request);
   const timeout = request.timeout || 60000; // 1 minute default

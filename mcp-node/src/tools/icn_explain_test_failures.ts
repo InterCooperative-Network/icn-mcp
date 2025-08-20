@@ -1,9 +1,13 @@
-export interface ExplainTestFailuresRequest {
-  testOutput: string;
-  testType?: 'npm' | 'vitest' | 'jest' | 'cargo' | 'mocha' | 'custom';
-  testCommand?: string;
-  context?: string;
-}
+import { z } from 'zod';
+
+export const ExplainTestFailuresRequestSchema = z.object({
+  testOutput: z.string().min(1, 'Test output is required'),
+  testType: z.enum(['npm', 'vitest', 'jest', 'cargo', 'mocha', 'custom']).optional(),
+  testCommand: z.string().optional(),
+  context: z.string().optional()
+}).strict();
+
+export type ExplainTestFailuresRequest = z.infer<typeof ExplainTestFailuresRequestSchema>;
 
 export interface TestFailureAnalysis {
   testName: string;
@@ -243,6 +247,16 @@ function parseTestOutput(output: string, testType: string): TestFailureAnalysis[
 }
 
 export async function icnExplainTestFailures(request: ExplainTestFailuresRequest): Promise<ExplainTestFailuresResponse> {
+  // Validate input
+  try {
+    ExplainTestFailuresRequestSchema.parse(request);
+  } catch (error: any) {
+    if (error?.errors) {
+      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+    }
+    throw error;
+  }
+
   const testType = request.testType || 'npm';
   const analyses = parseTestOutput(request.testOutput, testType);
   
