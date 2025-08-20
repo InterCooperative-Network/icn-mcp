@@ -23,3 +23,4 @@ export const POLICY_RULES_PATH =
   process.env.POLICY_RULES_PATH ?? path.join(REPO_ROOT, "mcp-server", "policy.rules.json");
 export const CODEOWNERS_PATH = process.env.CODEOWNERS_PATH ?? path.join(REPO_ROOT, "CODEOWNERS");
 export const ICN_MCP_LOG_DIR = process.env.ICN_MCP_LOG_DIR ?? path.join(REPO_ROOT, "var", "logs");
+export const ICN_MCP_LOG_MAX_KB = process.env.ICN_MCP_LOG_MAX_KB ? parseInt(process.env.ICN_MCP_LOG_MAX_KB, 10) : 10;

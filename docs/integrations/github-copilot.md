@@ -78,6 +78,7 @@ The MCP server supports configuration via environment variables:
 
 **Logs Configuration:**
 - `ICN_MCP_LOG_DIR`: Override log directory for recent logs resource (default: `{REPO_ROOT}/var/logs`)
+- `ICN_MCP_LOG_MAX_KB`: Override maximum log content size in kilobytes (default: 10)
 
 **Example .env configuration:**
 ```bash
@@ -88,6 +89,7 @@ POLICY_RULES_PATH=/path/to/icn-mcp/mcp-server/policy.rules.json
 
 # Logs configuration
 ICN_MCP_LOG_DIR=/path/to/icn-mcp/var/logs
+ICN_MCP_LOG_MAX_KB=20
 
 # Consent system configuration
 ICN_CONSENT_REQUIRE_ALL=false
@@ -392,9 +394,9 @@ The ICN MCP server also exposes resources through the MCP resources capability, 
   - MIME Type: `text/plain`
 
 - **`icn://logs/recent`**: Recent system logs
-  - Content: Latest 10KB of log files from ICN_MCP_LOG_DIR (sanitized for security)
+  - Content: Configurable amount of log files from ICN_MCP_LOG_DIR (sanitized for security)
   - MIME Type: `text/plain`
-  - Features: Automatic secret redaction, sorted by modification time, size limits
+  - Features: Automatic secret redaction, sorted by modification time, configurable size limits (ICN_MCP_LOG_MAX_KB)
 
 ### Using Resources
 
