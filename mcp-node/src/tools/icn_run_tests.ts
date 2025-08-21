@@ -1,15 +1,19 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 import { STDOUT_TRUNCATE_LIMIT, STDERR_TRUNCATE_LIMIT } from './constants.js';
+import { rethrowZod } from '../lib/zod-helpers.js';
 
-export interface RunTestsRequest {
-  testType?: 'npm' | 'cargo' | 'just' | 'custom';
-  testCommand?: string;
-  workspace?: string;
-  testFile?: string;
-  timeout?: number;
-}
+export const RunTestsRequestSchema = z.object({
+  testType: z.enum(['npm', 'cargo', 'just', 'custom']).optional(),
+  testCommand: z.string().optional(),
+  workspace: z.string().optional(),
+  testFile: z.string().optional(),
+  timeout: z.number().int().positive().max(600000).optional()
+}).strict();
+
+export type RunTestsRequest = z.infer<typeof RunTestsRequestSchema>;
 
 export interface TestResult {
   passed: number;
@@ -145,6 +149,13 @@ function buildTestCommand(request: RunTestsRequest): string[] {
 }
 
 export async function icnRunTests(request: RunTestsRequest): Promise<RunTestsResponse> {
+  // Validate input
+  try {
+    RunTestsRequestSchema.parse(request);
+  } catch (error) {
+    rethrowZod(error);
+  }
+
   const repoRoot = getRepoRoot();
   const command = buildTestCommand(request);
   const timeout = request.timeout || 120000; // 2 minutes default

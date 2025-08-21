@@ -963,7 +963,9 @@ class ICNMCPServer {
               testOutput: args.testOutput as string,
               testType,
               testCommand,
-              context
+              context,
+              maxFindings: typeof args.maxFindings === 'number' ? args.maxFindings : 10,
+              includeStack: typeof args.includeStack === 'boolean' ? args.includeStack : false
             }));
             return {
               content: [

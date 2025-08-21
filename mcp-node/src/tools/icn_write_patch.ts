@@ -1,14 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 import { icnCheckPolicy, PolicyCheckRequest } from './icn_check_policy.js';
+import { rethrowZod } from '../lib/zod-helpers.js';
 
-export interface WritePatchRequest {
-  filePath: string;
-  content: string;
-  createIfNotExists?: boolean;
-  actor?: string;
-  description?: string;
-}
+export const WritePatchRequestSchema = z.object({
+  filePath: z.string().min(1, 'File path is required'),
+  content: z.string(),
+  createIfNotExists: z.boolean().optional(),
+  actor: z.string().optional(),
+  description: z.string().optional()
+}).strict();
+
+export type WritePatchRequest = z.infer<typeof WritePatchRequestSchema>;
 
 export interface WritePatchResponse {
   success: boolean;
@@ -38,28 +42,47 @@ function getRepoRoot(): string {
 }
 
 export async function icnWritePatch(request: WritePatchRequest): Promise<WritePatchResponse> {
-  const repoRoot = getRepoRoot();
-  const filePath = path.isAbsolute(request.filePath) 
-    ? request.filePath 
-    : path.resolve(repoRoot, request.filePath);
+  // Validate input
+  try {
+    WritePatchRequestSchema.parse(request);
+  } catch (error) {
+    rethrowZod(error);
+  }
+
+  // Set defaults after validation
+  const finalRequest = {
+    ...request,
+    createIfNotExists: request.createIfNotExists ?? false,
+    actor: request.actor ?? 'unknown'
+  };
+
+  const repoRoot = path.resolve(getRepoRoot());
+  const absTarget = path.resolve(repoRoot, finalRequest.filePath);
   
-  // Ensure file path is within repo root for security
-  if (!filePath.startsWith(repoRoot)) {
+  // Enforce repo boundary with proper path resolution
+  if (!absTarget.startsWith(repoRoot + path.sep)) {
     throw new Error('File path must be within repository boundaries');
   }
   
-  const relativePath = path.relative(repoRoot, filePath);
-  const fileExists = fs.existsSync(filePath);
+  // Block dangerous roots using relative path
+  const dangerous = [".git", "node_modules", ".env", ".env.local", ".env.production"];
+  const rel = path.relative(repoRoot, absTarget).split(path.sep);
+  if (dangerous.includes(rel[0])) {
+    throw new Error(`Writing to ${rel.join("/")} is not allowed for security reasons`);
+  }
+  
+  const relativePath = path.relative(repoRoot, absTarget);
+  const fileExists = fs.existsSync(absTarget);
   
   // Check if file exists when createIfNotExists is false
-  if (!fileExists && !request.createIfNotExists) {
-    throw new Error(`File does not exist and createIfNotExists is false: ${request.filePath}`);
+  if (!fileExists && !finalRequest.createIfNotExists) {
+    throw new Error(`File does not exist and createIfNotExists is false: ${finalRequest.filePath}`);
   }
   
   // Check policy before making any changes
   const policyRequest: PolicyCheckRequest = {
     changeset: [relativePath],
-    actor: request.actor || 'unknown'
+    actor: finalRequest.actor || 'unknown'
   };
   
   const policyResult = await icnCheckPolicy(policyRequest);
@@ -67,7 +90,7 @@ export async function icnWritePatch(request: WritePatchRequest): Promise<WritePa
   if (!policyResult.allow) {
     return {
       success: false,
-      filePath,
+      filePath: absTarget,
       relativePath,
       operation: fileExists ? 'update' : 'create',
       linesWritten: 0,
@@ -81,19 +104,19 @@ export async function icnWritePatch(request: WritePatchRequest): Promise<WritePa
   
   try {
     // Ensure directory exists
-    const dir = path.dirname(filePath);
+    const dir = path.dirname(absTarget);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
     // Write the file
-    fs.writeFileSync(filePath, request.content, 'utf8');
+    fs.writeFileSync(absTarget, finalRequest.content, 'utf8');
     
-    const linesWritten = request.content ? request.content.split('\n').length : 0;
+    const linesWritten = finalRequest.content ? finalRequest.content.split('\n').length : 0;
     
     return {
       success: true,
-      filePath,
+      filePath: absTarget,
       relativePath,
       operation: fileExists ? 'update' : 'create',
       linesWritten,
