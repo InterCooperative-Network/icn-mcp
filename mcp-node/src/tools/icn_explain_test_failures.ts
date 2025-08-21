@@ -1,8 +1,18 @@
 import { z } from 'zod';
+import { rethrowZod, TestTypeSchema, KnownTestType } from '../lib/zod-helpers.js';
 
 export const ExplainTestFailuresRequestSchema = z.object({
-  testOutput: z.string().min(1, 'Test output is required'),
-  testType: z.enum(['npm', 'vitest', 'jest', 'cargo', 'mocha', 'custom']).optional(),
+  testOutput: z.any().transform(v => {
+    if (typeof v === "string") return v;
+    try { return v == null ? "" : String(v); } catch { return ""; }
+  }).default("").catch(""),
+
+  testType: TestTypeSchema,
+
+  maxFindings: z.number().int().min(1).max(50).default(10).catch(10),
+  includeStack: z.boolean().default(false).catch(false),
+  
+  // Legacy fields for backward compatibility
   testCommand: z.string().optional(),
   context: z.string().optional()
 }).strict();
@@ -21,11 +31,18 @@ export interface TestFailureAnalysis {
 }
 
 export interface ExplainTestFailuresResponse {
-  totalFailures: number;
-  categorySummary: Record<string, number>;
-  analyses: TestFailureAnalysis[];
-  overallSuggestions: string[];
-  priorityOrder: number[]; // Indices into analyses array, ordered by priority
+  ok: boolean;
+  findings: TestFailureAnalysis[];
+  summary: string;
+  testType: KnownTestType;
+  maxFindings: number;
+  includeStack: boolean;
+  // Legacy fields for backward compatibility
+  totalFailures?: number;
+  categorySummary?: Record<string, number>;
+  analyses?: TestFailureAnalysis[];
+  overallSuggestions?: string[];
+  priorityOrder?: number[];
 }
 
 function categorizeFailure(error: string, _testName: string): {
@@ -248,26 +265,44 @@ function parseTestOutput(output: string, testType: string): TestFailureAnalysis[
 
 export async function icnExplainTestFailures(request: ExplainTestFailuresRequest): Promise<ExplainTestFailuresResponse> {
   // Validate input
+  let input: ExplainTestFailuresRequest;
   try {
-    ExplainTestFailuresRequestSchema.parse(request);
-  } catch (error: any) {
-    if (error?.errors) {
-      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
-    }
-    throw error;
+    input = ExplainTestFailuresRequestSchema.parse(request);
+  } catch (error) {
+    rethrowZod(error);
   }
 
-  const testType = request.testType || 'npm';
-  const analyses = parseTestOutput(request.testOutput, testType);
+  // Handle empty test output gracefully
+  if (!input.testOutput.trim()) {
+    return {
+      ok: true,
+      findings: [],
+      summary: "No test output supplied. Provide raw test runner output to analyze.",
+      testType: input.testType,
+      maxFindings: input.maxFindings,
+      includeStack: input.includeStack,
+      // Legacy fields for backward compatibility
+      totalFailures: 0,
+      categorySummary: {},
+      analyses: [],
+      overallSuggestions: ["No test output supplied. Provide raw test runner output to analyze."],
+      priorityOrder: []
+    };
+  }
+
+  const analyses = parseTestOutput(input.testOutput, input.testType);
+  
+  // Limit findings based on maxFindings
+  const limitedAnalyses = analyses.slice(0, input.maxFindings);
   
   // Create category summary
   const categorySummary: Record<string, number> = {};
-  for (const analysis of analyses) {
+  for (const analysis of limitedAnalyses) {
     categorySummary[analysis.category] = (categorySummary[analysis.category] || 0) + 1;
   }
   
   // Create priority order (high severity first, then by category importance)
-  const priorityOrder = analyses
+  const priorityOrder = limitedAnalyses
     .map((analysis, index) => ({ index, analysis }))
     .sort((a, b) => {
       // First by severity
@@ -300,17 +335,29 @@ export async function icnExplainTestFailures(request: ExplainTestFailuresRequest
     overallSuggestions.push('Verify test expectations match implementation behavior');
   }
   
-  if (analyses.length > 5) {
+  if (limitedAnalyses.length > 5) {
     overallSuggestions.push('Consider running tests individually to isolate issues');
   }
   
   overallSuggestions.push('Check recent changes that might have introduced these failures');
   overallSuggestions.push('Review the complete stack trace for additional context');
   
+  // Generate summary
+  const summary = limitedAnalyses.length > 0 
+    ? `Found ${limitedAnalyses.length} test failure${limitedAnalyses.length > 1 ? 's' : ''} across ${Object.keys(categorySummary).length} categories`
+    : "No test failures detected in the provided output";
+
   return {
-    totalFailures: analyses.length,
+    ok: true,
+    findings: limitedAnalyses,
+    summary,
+    testType: input.testType,
+    maxFindings: input.maxFindings,
+    includeStack: input.includeStack,
+    // Legacy fields for backward compatibility
+    totalFailures: limitedAnalyses.length,
     categorySummary,
-    analyses,
+    analyses: limitedAnalyses,
     overallSuggestions,
     priorityOrder
   };

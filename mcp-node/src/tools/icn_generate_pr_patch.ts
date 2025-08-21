@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { icnCheckPolicy, PolicyCheckRequest } from './icn_check_policy.js';
+import { rethrowZod } from '../lib/zod-helpers.js';
 
 export const GeneratePRPatchRequestSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -193,11 +194,8 @@ export async function icnGeneratePRPatch(request: GeneratePRPatchRequest): Promi
   // Validate input
   try {
     GeneratePRPatchRequestSchema.parse(request);
-  } catch (error: any) {
-    if (error?.errors) {
-      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
-    }
-    throw error;
+  } catch (error) {
+    rethrowZod(error);
   }
 
   const repoRoot = getRepoRoot();

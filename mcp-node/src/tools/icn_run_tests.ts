@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { STDOUT_TRUNCATE_LIMIT, STDERR_TRUNCATE_LIMIT } from './constants.js';
+import { rethrowZod } from '../lib/zod-helpers.js';
 
 export const RunTestsRequestSchema = z.object({
   testType: z.enum(['npm', 'cargo', 'just', 'custom']).optional(),
@@ -151,11 +152,8 @@ export async function icnRunTests(request: RunTestsRequest): Promise<RunTestsRes
   // Validate input
   try {
     RunTestsRequestSchema.parse(request);
-  } catch (error: any) {
-    if (error?.errors) {
-      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
-    }
-    throw error;
+  } catch (error) {
+    rethrowZod(error);
   }
 
   const repoRoot = getRepoRoot();

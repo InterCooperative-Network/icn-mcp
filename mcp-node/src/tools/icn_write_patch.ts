@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { icnCheckPolicy, PolicyCheckRequest } from './icn_check_policy.js';
+import { rethrowZod } from '../lib/zod-helpers.js';
 
 export const WritePatchRequestSchema = z.object({
   filePath: z.string().min(1, 'File path is required'),
@@ -44,11 +45,8 @@ export async function icnWritePatch(request: WritePatchRequest): Promise<WritePa
   // Validate input
   try {
     WritePatchRequestSchema.parse(request);
-  } catch (error: any) {
-    if (error?.errors) {
-      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
-    }
-    throw error;
+  } catch (error) {
+    rethrowZod(error);
   }
 
   // Set defaults after validation
@@ -58,24 +56,23 @@ export async function icnWritePatch(request: WritePatchRequest): Promise<WritePa
     actor: request.actor ?? 'unknown'
   };
 
-  const repoRoot = getRepoRoot();
-  const filePath = path.isAbsolute(finalRequest.filePath) 
-    ? finalRequest.filePath 
-    : path.resolve(repoRoot, finalRequest.filePath);
+  const repoRoot = path.resolve(getRepoRoot());
+  const absTarget = path.resolve(repoRoot, finalRequest.filePath);
   
-  // Ensure file path is within repo root for security
-  if (!filePath.startsWith(repoRoot)) {
+  // Enforce repo boundary with proper path resolution
+  if (!absTarget.startsWith(repoRoot + path.sep)) {
     throw new Error('File path must be within repository boundaries');
   }
   
-  // Additional security: prevent writing to dangerous locations
-  const relativePath = path.relative(repoRoot, filePath);
-  const dangerousPaths = ['.git/', 'node_modules/', '.env', '.env.local', '.env.production'];
-  if (dangerousPaths.some(dangerous => relativePath.startsWith(dangerous))) {
-    throw new Error(`Writing to ${relativePath} is not allowed for security reasons`);
+  // Block dangerous roots using relative path
+  const dangerous = [".git", "node_modules", ".env", ".env.local", ".env.production"];
+  const rel = path.relative(repoRoot, absTarget).split(path.sep);
+  if (dangerous.includes(rel[0])) {
+    throw new Error(`Writing to ${rel.join("/")} is not allowed for security reasons`);
   }
   
-  const fileExists = fs.existsSync(filePath);
+  const relativePath = path.relative(repoRoot, absTarget);
+  const fileExists = fs.existsSync(absTarget);
   
   // Check if file exists when createIfNotExists is false
   if (!fileExists && !finalRequest.createIfNotExists) {
@@ -93,7 +90,7 @@ export async function icnWritePatch(request: WritePatchRequest): Promise<WritePa
   if (!policyResult.allow) {
     return {
       success: false,
-      filePath,
+      filePath: absTarget,
       relativePath,
       operation: fileExists ? 'update' : 'create',
       linesWritten: 0,
@@ -107,19 +104,19 @@ export async function icnWritePatch(request: WritePatchRequest): Promise<WritePa
   
   try {
     // Ensure directory exists
-    const dir = path.dirname(filePath);
+    const dir = path.dirname(absTarget);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
     // Write the file
-    fs.writeFileSync(filePath, finalRequest.content, 'utf8');
+    fs.writeFileSync(absTarget, finalRequest.content, 'utf8');
     
     const linesWritten = finalRequest.content ? finalRequest.content.split('\n').length : 0;
     
     return {
       success: true,
-      filePath,
+      filePath: absTarget,
       relativePath,
       operation: fileExists ? 'update' : 'create',
       linesWritten,

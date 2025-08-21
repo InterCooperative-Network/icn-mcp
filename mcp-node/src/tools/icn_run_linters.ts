@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { STDOUT_TRUNCATE_LIMIT, STDERR_TRUNCATE_LIMIT } from './constants.js';
+import { rethrowZod } from '../lib/zod-helpers.js';
 
 export const RunLintersRequestSchema = z.object({
   linterType: z.enum(['eslint', 'prettier', 'tsc', 'custom']).optional(),
@@ -193,11 +194,8 @@ export async function icnRunLinters(request: RunLintersRequest): Promise<RunLint
   // Validate input
   try {
     RunLintersRequestSchema.parse(request);
-  } catch (error: any) {
-    if (error?.errors) {
-      throw new Error(`Invalid input: ${error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
-    }
-    throw error;
+  } catch (error) {
+    rethrowZod(error);
   }
 
   const repoRoot = getRepoRoot();

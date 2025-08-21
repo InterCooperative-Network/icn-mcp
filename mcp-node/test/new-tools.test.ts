@@ -410,17 +410,26 @@ describe('Zod Input Validation Tests', () => {
   });
 
   describe('icnExplainTestFailures validation', () => {
-    it('should reject empty test output', async () => {
-      await expect(icnExplainTestFailures({
+    it('should handle empty test output gracefully', async () => {
+      const result = await icnExplainTestFailures({
         testOutput: ''
-      })).rejects.toThrow();
+      });
+      
+      expect(result).toBeDefined();
+      expect(result.ok).toBe(true);
+      expect(result.findings).toEqual([]);
+      expect(result.summary).toContain('No test output supplied');
     });
 
-    it('should reject invalid test type', async () => {
-      await expect(icnExplainTestFailures({
+    it('should handle invalid test type gracefully', async () => {
+      const result = await icnExplainTestFailures({
         testOutput: 'test output',
         testType: 'invalid' as any
-      })).rejects.toThrow();
+      });
+      
+      expect(result).toBeDefined();
+      expect(result.ok).toBe(true);
+      expect(result.testType).toBe('custom'); // Should default to 'custom'
     });
 
     it('should accept valid test types', async () => {
